@@ -1,4 +1,4 @@
-# 胸訴 — 胸腔科門診問診（wanfang-chest）v2.2
+# 胸訴 — 胸腔科門診問診（wanfang-chest）v2.3
 
 架構比照 `wanfang-aphasia`（語圖）：無後端、資料只存本機、GitHub Pages 直接部署。
 

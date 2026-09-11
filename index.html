@@ -284,6 +284,11 @@ footer{ padding:16px 14px 110px; text-align:center; color:var(--ink-soft); font-
 .about{ background:var(--surface); border-radius:10px; padding:12px 14px; font-size:calc(13.5px * var(--step)); line-height:1.65; }
 .about b{ display:block; font-size:calc(15px * var(--step)); margin-bottom:4px; }
 .seg.wrap button{ flex:1 1 30%; }
+.docsum{ display:block; width:100%; min-height:220px; resize:vertical; overflow:hidden;
+  border:2px solid var(--line); border-radius:12px; background:#FAFCFC; padding:14px 16px;
+  font:inherit; font-size:calc(15.5px * var(--step)); line-height:1.7; color:var(--ink); white-space:pre-wrap; }
+.docsum:focus{ border-color:var(--teal); background:#fff; }
+@media print{ .docsum{ border:1px solid #999; background:#fff; overflow:visible; } }
 .voicepick{ display:flex; gap:8px; }
 .voicepick select{ flex:1; min-width:0; min-height:52px; border:2px solid var(--line); border-radius:9px;
   padding:8px 10px; font:inherit; font-size:calc(16px * var(--step)); background:var(--paper); color:var(--ink); }
@@ -403,7 +408,7 @@ footer{ padding:16px 14px 110px; text-align:center; color:var(--ink-soft); font-
    版本與預期用途（院內規範用；改版時一併更新）
    ============================================================ */
 const APP = {
-  version:"v2.2",
+  version:"v2.3",
   date:"2026-09-11",
   url:"https://maguro631023.github.io/wanfang-chest/",
   purpose:"協助門診病人於看診前，以點選、圖示與語音整理症狀與病史，產出供醫師參考的摘要。不做診斷，不提供治療建議，不取代醫師問診。",
@@ -1236,9 +1241,11 @@ const view = document.getElementById("view");
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
 
 function paintChrome(){
-  document.documentElement.lang = foreign() ? L().code : "zh-Hant-TW";
-  document.getElementById("brandSub").textContent = T("brandSub");
-  const ft = T("footer");
+  const zhOnly = screen === "doc";                       // 醫師端一律華語
+  const TT = k => zhOnly ? UI_ZH[k] : T(k);
+  document.documentElement.lang = (!zhOnly && foreign()) ? L().code : "zh-Hant-TW";
+  document.getElementById("brandSub").textContent = TT("brandSub");
+  const ft = TT("footer");
   ["ft0","ft1","ft2"].forEach((id, i) => { document.getElementById(id).textContent = ft[i] || ""; });
   document.getElementById("alertHead").textContent = T("alertHead");
   document.getElementById("alertOk").textContent = T("alertOk");
@@ -1618,6 +1625,9 @@ function renderDoc(){
 
     ${isAnswered(qById("note")) ? `<h2>病人補充${pl.foreign ? ` <small>以${pl.zhName}輸入</small>` : ""}</h2><div class="saybox" style="font-size:18px">${esc(ans.note.trim())}</div>` : ""}
 
+    <h2>病歷摘要 <small>與「複製摘要文字」內容相同，可先在這裡修改再複製</small></h2>
+    <textarea class="docsum" id="docSum" spellcheck="false" aria-label="病歷摘要">${esc(docText())}</textarea>
+
     <div class="docactions">
       <button class="bigbtn ok" id="dCopy">複製摘要文字（貼到病歷）</button>
       <button class="bigbtn ghost" id="dPrint">列印</button>
@@ -1627,8 +1637,11 @@ function renderDoc(){
   </div>`;
 
   view.querySelectorAll("[data-ck]").forEach(c => c.onchange = () => { meta.checks[c.dataset.ck] = c.checked; save(); });
+  const sum = document.getElementById("docSum");
+  const fit = () => { sum.style.height = "auto"; sum.style.height = (sum.scrollHeight + 4) + "px"; };
+  fit(); sum.addEventListener("input", fit);
   document.getElementById("dCopy").onclick = async () => {
-    const t = docText();
+    const t = sum.value;
     try { await navigator.clipboard.writeText(t); flash("已複製摘要文字"); }
     catch(e){
       const ta = document.createElement("textarea"); ta.value = t; document.body.appendChild(ta); ta.select();
