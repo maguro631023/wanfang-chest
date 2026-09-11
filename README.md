@@ -1,4 +1,4 @@
-# 胸訴 — 胸腔科門診問診（wanfang-chest）v2.0
+# 胸訴 — 胸腔科門診問診（wanfang-chest）v2.1
 
 架構比照 `wanfang-aphasia`（語圖）：無後端、資料只存本機、GitHub Pages 直接部署。
 
@@ -7,7 +7,8 @@
 |---|---|
 | `index.html` | 程式、題庫（`Q`）、醫師補問清單（`GROUPS`）、臨床提醒（`insights()`） |
 | `i18n.js` | 英語、印尼語、越南語、日語譯文（**尚未經母語者校對**） |
-| `manifest.json`、`sw.js` | 加到主畫面、離線使用；改版時把 `sw.js` 的 `VERSION` 加一 |
+| `manifest.json`、`sw.js` | PWA：可安裝、離線使用、新版本提示；改版時把 `sw.js` 的 `VERSION` 加一 |
+| `assets/qr.svg`、`qr.png` | 設定頁的 QR Code（網址改變時需重新產生） |
 | `assets/img/` | 自訂圖示（選用），檔名要列在 `assets/img/index.json` |
 | `assets/audio/nan/`、`assets/audio/hak/` | 台語、客語預錄音檔（選用） |
 
@@ -28,6 +29,11 @@
 ## 錄音命名
 `assets/audio/{nan|hak}/{題目id}.mp3`、`{題目id}__{選項值}.mp3`，另有 `hero`、`notice`、`alert`、`review`。
 完整清單見「胸訴_翻譯校對表.xlsx」的「台語客語錄音清單」分頁。
+
+## PWA
+- 設定頁「安裝成 App」：Chrome 會出現安裝按鈕；iPhone 顯示「分享 → 加入主畫面」步驟。
+- 安裝後可離線使用；長按 App 圖示可直接開「醫師摘要」（`?mode=doc`）。
+- 推出新版後，已開啟的 App 會顯示「有新版本，按這裡更新」，按下才更新，填到一半不會被打斷。
 
 ## 審閱
 - 臨床內容與院內規範：「胸訴_臨床內容與院內規範審閱表.docx」（由題庫程式碼直接匯出）。

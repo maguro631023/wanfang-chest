@@ -1,14 +1,24 @@
 {
+  "id": "./",
   "name": "胸訴 — 胸腔科門診問診",
   "short_name": "胸訴",
+  "description": "門診病人以點選、圖示與語音整理症狀與病史，產出供醫師參考的摘要。研發測試中，非醫療器材。",
   "lang": "zh-Hant-TW",
-  "start_url": "./",
+  "dir": "ltr",
+  "start_url": "./?source=pwa",
   "scope": "./",
   "display": "standalone",
+  "orientation": "any",
   "background_color": "#FFFFFF",
   "theme_color": "#0F2233",
+  "categories": ["medical", "health"],
   "icons": [
-    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "開始填寫", "short_name": "開始填寫", "url": "./?source=pwa", "icons": [{ "src": "assets/icon-192.png", "sizes": "192x192" }] },
+    { "name": "醫師摘要", "short_name": "醫師摘要", "url": "./?mode=doc&source=pwa", "icons": [{ "src": "assets/icon-192.png", "sizes": "192x192" }] }
   ]
 }

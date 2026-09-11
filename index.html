@@ -6,7 +6,10 @@
 <title>胸訴 — 胸腔科門診問診</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0F2233">
-<link rel="apple-touch-icon" href="assets/icon-192.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="assets/icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="description" content="胸腔科門診問診：病人以點選、圖示與語音整理症狀與病史。研發測試中，非醫療器材。">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="胸訴">
@@ -281,6 +284,25 @@ footer{ padding:16px 14px 110px; text-align:center; color:var(--ink-soft); font-
 .about{ background:var(--surface); border-radius:10px; padding:12px 14px; font-size:calc(13.5px * var(--step)); line-height:1.65; }
 .about b{ display:block; font-size:calc(15px * var(--step)); margin-bottom:4px; }
 .seg.wrap button{ flex:1 1 30%; }
+/* ---------- v2.1：QR Code、安裝、更新 ---------- */
+.qrbox{ border:2px solid var(--line); border-radius:var(--radius); background:var(--surface); padding:16px; text-align:center; }
+.qrbox .qr{ width:210px; height:210px; max-width:100%; background:#fff; padding:8px; border-radius:8px;
+  image-rendering:pixelated; display:block; margin:0 auto 10px; }
+.qrurl{ font-size:calc(12.5px * var(--step)); color:var(--ink-soft); word-break:break-all; margin-bottom:10px; }
+.btnrow{ display:flex; gap:8px; }
+.btnrow .bigbtn{ flex:1; min-height:52px; font-size:calc(17px * var(--step)); padding:10px; }
+.install{ border:2px solid var(--line); border-radius:var(--radius); padding:14px 16px; }
+.install p{ margin:0 0 10px; font-size:calc(15px * var(--step)); line-height:1.6; }
+.install .ok{ color:var(--teal-dark); font-weight:800; }
+.install ol{ margin:0 0 4px; padding-left:1.4em; font-size:calc(15px * var(--step)); line-height:1.7; }
+.status{ display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+.status span{ font-size:calc(12.5px * var(--step)); font-weight:700; border-radius:999px; padding:3px 10px;
+  background:var(--surface); color:var(--ink-soft); }
+.status span.y{ background:var(--teal-tint); color:var(--teal-dark); }
+.updbar{ position:fixed; left:50%; top:74px; transform:translateX(-50%); z-index:50; background:var(--teal); color:#fff;
+  border:0; border-radius:999px; padding:12px 22px; font-weight:800; font-size:calc(16px * var(--step));
+  box-shadow:0 10px 30px rgba(15,34,51,.3); max-width:92vw; }
+@media (display-mode: standalone){ .topbar{ padding-top:calc(10px + env(safe-area-inset-top)); } }
 .tile.row .label{ flex-direction:column; align-items:flex-start; justify-content:center; }
 .tile.row.on .label{ padding-right:50px; }
 .brand{ min-width:0; }
@@ -313,6 +335,7 @@ footer{ padding:16px 14px 110px; text-align:center; color:var(--ink-soft); font-
 </div></nav>
 
 <div class="said" id="said" hidden aria-live="polite"></div>
+<button class="updbar" id="updBar" hidden>有新版本，按這裡更新</button>
 
 <div class="alert" id="alert" hidden role="alertdialog" aria-labelledby="alertHead">
   <div class="card">
@@ -346,6 +369,17 @@ footer{ padding:16px 14px 110px; text-align:center; color:var(--ink-soft); font-
       </div></div>
     <button class="bigbtn ghost block" id="btnTest">測試語音</button>
     <p class="fnote" id="voiceInfo" style="margin-top:-8px"></p>
+    <div class="field"><span>用手機掃描開啟</span>
+      <div class="qrbox">
+        <img class="qr" src="assets/qr.svg" alt="胸訴網址的 QR Code" onerror="this.onerror=null;this.src='assets/qr.png'">
+        <div class="qrurl" id="qrUrl"></div>
+        <div class="btnrow">
+          <button class="bigbtn ghost" id="btnCopy">複製網址</button>
+          <button class="bigbtn ghost" id="btnShare" hidden>分享</button>
+        </div>
+      </div></div>
+    <div class="field"><span>安裝成 App</span>
+      <div class="install" id="installBox"></div></div>
     <div class="about" id="about"></div>
     <button class="bigbtn warn block" id="btnWipe">清除這台裝置上的所有填答</button>
     <button class="bigbtn ok block" id="btnClose">完成</button>
@@ -359,8 +393,9 @@ footer{ padding:16px 14px 110px; text-align:center; color:var(--ink-soft); font-
    版本與預期用途（院內規範用；改版時一併更新）
    ============================================================ */
 const APP = {
-  version:"v2.0",
+  version:"v2.1",
   date:"2026-09-11",
+  url:"https://maguro631023.github.io/wanfang-chest/",
   purpose:"協助門診病人於看診前，以點選、圖示與語音整理症狀與病史，產出供醫師參考的摘要。不做診斷，不提供治療建議，不取代醫師問診。",
   data:"所有填答只存在本機瀏覽器（localStorage），不連線上傳；看診後由病人或工作人員清除。",
   review:"臨床內容待胸腔科醫師審閱；外語譯文待母語者校對（審閱表另附）。",
@@ -1607,6 +1642,7 @@ document.getElementById("btnSet").onclick = () => {
   document.getElementById("voiceInfo").textContent = !hasTTS ? "這個瀏覽器不支援語音朗讀。"
     : l.foreign ? (voiceOK(l.id) ? `這台裝置有${l.zhName}語音。` : `這台裝置沒有${l.zhName}語音，會改用華語唸；可到系統設定下載語音資料。`)
     : ((speechSynthesis.getVoices() || []).some(v => /zh/i.test(v.lang)) ? "這台裝置有中文語音。" : "尚未偵測到中文語音；若按測試沒有聲音，請到系統設定下載中文語音。");
+  paintShare(); paintInstall();
   dlg.showModal();
 };
 document.getElementById("btnClose").onclick = () => dlg.close();
@@ -1618,9 +1654,79 @@ applySettings();
 if (L().audio) probeAudio(settings.lang);
 render();
 
-if ("serviceWorker" in navigator && location.protocol === "https:"){
-  navigator.serviceWorker.register("sw.js").catch(() => {});
+/* ============================================================
+   9. PWA：QR Code、安裝、離線、版本更新
+   ============================================================ */
+const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true;
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+let deferredPrompt = null, swReg = null;
+
+function paintShare(){
+  document.getElementById("qrUrl").textContent = APP.url;
+  const sh = document.getElementById("btnShare");
+  sh.hidden = !navigator.share;
 }
+document.getElementById("btnCopy").onclick = async () => {
+  try { await navigator.clipboard.writeText(APP.url); flash("已複製網址"); }
+  catch(e){ prompt("請複製這個網址", APP.url); }
+};
+document.getElementById("btnShare").onclick = () => {
+  navigator.share({ title:"胸訴 — 胸腔科門診問診", text:"用點的，告訴醫生您哪裡不舒服", url:APP.url }).catch(() => {});
+};
+
+function paintInstall(){
+  const box = document.getElementById("installBox");
+  const offline = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
+  const status = `<div class="status">
+    <span class="${isStandalone() ? "y" : ""}">${isStandalone() ? "✓ App 模式" : "瀏覽器模式"}</span>
+    <span class="${offline ? "y" : ""}">${offline ? "✓ 可離線使用" : "離線功能尚未就緒"}</span>
+    <span>${APP.version}</span></div>`;
+  if (isStandalone()){
+    box.innerHTML = `<p class="ok">已安裝，正在以 App 模式執行。</p>${status}`;
+  } else if (deferredPrompt){
+    box.innerHTML = `<p>安裝後會出現在主畫面，開啟時沒有網址列，沒有網路也能使用。</p>
+      <button class="bigbtn ok block" id="btnInstall">安裝到這台裝置</button>${status}`;
+    document.getElementById("btnInstall").onclick = async () => {
+      deferredPrompt.prompt();
+      const r = await deferredPrompt.userChoice.catch(() => null);
+      deferredPrompt = null;
+      if (r && r.outcome === "accepted") flash("已安裝");
+      paintInstall();
+    };
+  } else if (isIOS){
+    box.innerHTML = `<p>iPhone／iPad 請用 <b>Safari</b> 開啟本網址，然後：</p>
+      <ol><li>按下方的「分享」按鈕 <b>⬆︎</b></li><li>往下滑，選「加入主畫面」</li><li>按右上角「新增」</li></ol>${status}`;
+  } else {
+    box.innerHTML = `<p>Android 請用 <b>Chrome</b> 開啟本網址，然後：</p>
+      <ol><li>按右上角選單 <b>⋮</b></li><li>選「安裝應用程式」或「加到主畫面」</li></ol>${status}`;
+  }
+}
+window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); deferredPrompt = e; if (dlg.open) paintInstall(); });
+window.addEventListener("appinstalled", () => { deferredPrompt = null; flash("已安裝到主畫面"); if (dlg.open) paintInstall(); });
+
+/* 新版本：不自動重新整理（避免病人填到一半畫面跳掉），改成顯示更新按鈕；
+   填答存在本機，更新後不會遺失。 */
+function showUpdate(worker){
+  const bar = document.getElementById("updBar");
+  bar.hidden = false;
+  bar.onclick = () => { bar.hidden = true; worker.postMessage("SKIP_WAITING"); };
+}
+if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")){
+  let reloading = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => { if (reloading) return; reloading = true; location.reload(); });
+  navigator.serviceWorker.register("sw.js").then(reg => {
+    swReg = reg;
+    if (reg.waiting && navigator.serviceWorker.controller) showUpdate(reg.waiting);
+    reg.addEventListener("updatefound", () => {
+      const w = reg.installing; if (!w) return;
+      w.addEventListener("statechange", () => { if (w.state === "installed" && navigator.serviceWorker.controller) showUpdate(w); });
+    });
+  }).catch(() => {});
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && swReg) swReg.update().catch(() => {}); });
+}
+
+/* 捷徑：?mode=doc 直接開醫師摘要（安裝後長按圖示可選） */
+if (new URLSearchParams(location.search).get("mode") === "doc"){ screen = "doc"; render(); }
 </script>
 </body>
 </html>
