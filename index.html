@@ -284,6 +284,10 @@ footer{ padding:16px 14px 110px; text-align:center; color:var(--ink-soft); font-
 .about{ background:var(--surface); border-radius:10px; padding:12px 14px; font-size:calc(13.5px * var(--step)); line-height:1.65; }
 .about b{ display:block; font-size:calc(15px * var(--step)); margin-bottom:4px; }
 .seg.wrap button{ flex:1 1 30%; }
+.voicepick{ display:flex; gap:8px; }
+.voicepick select{ flex:1; min-width:0; min-height:52px; border:2px solid var(--line); border-radius:9px;
+  padding:8px 10px; font:inherit; font-size:calc(16px * var(--step)); background:var(--paper); color:var(--ink); }
+.voicepick .bigbtn{ min-height:52px; padding:8px 16px; font-size:calc(17px * var(--step)); }
 /* ---------- v2.1：QR Code、安裝、更新 ---------- */
 .qrbox{ border:2px solid var(--line); border-radius:var(--radius); background:var(--surface); padding:16px; text-align:center; }
 .qrbox .qr{ width:210px; height:210px; max-width:100%; background:#fff; padding:8px; border-radius:8px;
@@ -359,6 +363,12 @@ footer{ padding:16px 14px 110px; text-align:center; color:var(--ink-soft); font-
       <div class="seg" data-set="autoread">
         <button data-v="on">唸</button><button data-v="off">不唸</button>
       </div></div>
+    <div class="field"><span>語音（只套用在這台裝置）</span>
+      <div class="voicepick">
+        <select id="voiceSel" aria-label="選擇語音"></select>
+        <button class="bigbtn ghost" id="btnTry">試聽</button>
+      </div>
+      <p class="fnote" id="voiceTip"></p></div>
     <div class="field"><span>語速</span>
       <div class="seg" data-set="rate">
         <button data-v="0.72">慢</button><button data-v="0.88">標準</button>
@@ -393,7 +403,7 @@ footer{ padding:16px 14px 110px; text-align:center; color:var(--ink-soft); font-
    版本與預期用途（院內規範用；改版時一併更新）
    ============================================================ */
 const APP = {
-  version:"v2.1",
+  version:"v2.2",
   date:"2026-09-11",
   url:"https://maguro631023.github.io/wanfang-chest/",
   purpose:"協助門診病人於看診前，以點選、圖示與語音整理症狀與病史，產出供醫師參考的摘要。不做診斷，不提供治療建議，不取代醫師問診。",
@@ -834,7 +844,8 @@ const store = (() => {
 
 let ans      = store.get("ans", {});
 let meta     = store.get("meta", {});
-let settings = Object.assign({ step:"1", autoread:"on", lang:"zh", rate:"0.88", text:"on" }, store.get("settings", {}));
+let settings = Object.assign({ step:"1", autoread:"on", lang:"zh", rate:"0.88", text:"on", voices:{} }, store.get("settings", {}));
+settings.voices = settings.voices || {};
 let screen   = "home";   // home | notice | q | review | doc
 let curId    = null;
 let returnToReview = false;
@@ -870,12 +881,48 @@ const hasTTS = "speechSynthesis" in window;
 const audioAvail = Object.create(null);
 let unlocked = false, curAudio = null;
 
+/* ------------------------------------------------------------
+   挑選語音
+   同一種語言，每台裝置裝的語音不同，瀏覽器列出的順序也不同。
+   舊版直接取「第一個」，所以 iPhone 可能拿到美佳（加強版，自然女聲），
+   iPad 卻拿到 Eddy 這類 Eloquence 引擎的趣味語音（機械感男聲）。
+   現在改為：① 使用者在設定頁為這台裝置指定的語音；② 否則依評分自動挑。
+   ------------------------------------------------------------ */
+const NOVELTY = /eloquence|\b(eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley|albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|fred|junior|ralph|kathy)\b/i;
+const GOOD = {
+  "zh-TW":/meijia|美佳|hsiaochen|曉臻|hsiaoyu|曉雨|yunjhe|雲哲|google\s*國語|國語（臺灣）|國語\(臺灣\)/i,
+  "en-US":/samantha|ava|allison|google us english|aria|jenny|guy/i,
+  "id-ID":/damayanti|gadis|ardi|google bahasa indonesia/i,
+  "vi-VN":/linh|hoaimy|namminh|google tiếng việt/i,
+  "ja-JP":/kyoko|o-ren|nanami|keita|google 日本語/i
+};
+const normLang = v => (v.lang || "").replace("_","-");
+function voiceScore(v, code){
+  const lang = normLang(v), base = code.split("-")[0];
+  const id = (v.name || "") + " " + (v.voiceURI || "");
+  if (lang.split("-")[0] !== base) return -1;
+  if (base === "zh" && /^(zh-HK|yue)/i.test(lang)) return -1;        // 粵語，不能拿來唸國語
+  let s = 10;
+  if (lang.toLowerCase() === code.toLowerCase()) s += 50;
+  else if (code === "zh-TW" && /zh-CN|cmn/i.test(lang)) s += 20;     // 國語其他腔調，勉強可用
+  if (NOVELTY.test(id)) s -= 60;                                       // 趣味／機械感語音
+  if (/enhanced|premium|加強|高品質|natural|neural|siri/i.test(id)) s += 30;
+  if (GOOD[code] && GOOD[code].test(id)) s += 20;
+  if (/compact/i.test(id)) s -= 5;
+  if (v.localService) s += 3;                                          // 本機語音，離線也能用
+  return s;
+}
+function voicesFor(code){
+  if (!hasTTS) return [];
+  return (speechSynthesis.getVoices() || [])
+    .map(v => ({ v, s:voiceScore(v, code) })).filter(x => x.s >= 0)
+    .sort((a, b) => b.s - a.s).map(x => x.v);
+}
 function pickVoice(code){
-  if (!hasTTS) return null;
-  const vs = speechSynthesis.getVoices() || [];
-  const base = code.split("-")[0];
-  return vs.find(v => v.lang && v.lang.replace("_","-") === code)
-      || vs.find(v => v.lang && v.lang.replace("_","-").split("-")[0] === base) || null;
+  const list = voicesFor(code);
+  if (!list.length) return null;
+  const want = (settings.voices || {})[code];
+  return (want && list.find(v => v.voiceURI === want)) || list[0];
 }
 function voiceOK(lg){ const l = langOf(lg); return !!(hasTTS && l.tts && pickVoice(l.code)); }
 function unlock(){
@@ -1633,7 +1680,7 @@ function applySettings(){
 }
 document.querySelectorAll(".seg[data-set]").forEach(seg => seg.addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
-  if (seg.dataset.set === "lang") setLang(b.dataset.v);
+  if (seg.dataset.set === "lang"){ setLang(b.dataset.v); paintVoices(); }
   else { settings[seg.dataset.set] = b.dataset.v; applySettings(); }
   if (screen !== "doc") render();
 }));
@@ -1642,10 +1689,48 @@ document.getElementById("btnSet").onclick = () => {
   document.getElementById("voiceInfo").textContent = !hasTTS ? "這個瀏覽器不支援語音朗讀。"
     : l.foreign ? (voiceOK(l.id) ? `這台裝置有${l.zhName}語音。` : `這台裝置沒有${l.zhName}語音，會改用華語唸；可到系統設定下載語音資料。`)
     : ((speechSynthesis.getVoices() || []).some(v => /zh/i.test(v.lang)) ? "這台裝置有中文語音。" : "尚未偵測到中文語音；若按測試沒有聲音，請到系統設定下載中文語音。");
-  paintShare(); paintInstall();
+  paintShare(); paintInstall(); paintVoices();
   dlg.showModal();
 };
 document.getElementById("btnClose").onclick = () => dlg.close();
+
+/* 語音選單：列出這台裝置上目前語言可用的語音，建議的排最前面 */
+const vCode = () => (L().foreign ? L().code : "zh-TW");
+function voiceLabel(v, i){
+  const id = v.name + " " + (v.voiceURI || "");
+  const tags = [];
+  if (i === 0) tags.push("建議");
+  if (/enhanced|premium|加強|高品質|natural|neural/i.test(id)) tags.push("高品質");
+  if (NOVELTY.test(id)) tags.push("機械感");
+  if (!v.localService) tags.push("需網路");
+  return `${v.name}（${normLang(v)}）${tags.length ? "・" + tags.join("、") : ""}`;
+}
+function paintVoices(){
+  const sel = document.getElementById("voiceSel"), tip = document.getElementById("voiceTip");
+  const code = vCode(), list = voicesFor(code), want = settings.voices[code];
+  if (!hasTTS || !list.length){
+    sel.innerHTML = `<option>這台裝置沒有${code === "zh-TW" ? "中文" : L().zhName}語音</option>`; sel.disabled = true;
+  } else {
+    sel.disabled = false;
+    sel.innerHTML = `<option value="">自動（${esc(list[0].name)}）</option>` +
+      list.map((v, i) => `<option value="${esc(v.voiceURI)}"${v.voiceURI === want ? " selected" : ""}>${esc(voiceLabel(v, i))}</option>`).join("");
+  }
+  const hq = list.some(v => /enhanced|premium|加強|高品質|natural|neural/i.test(v.name + " " + (v.voiceURI || "")));
+  tip.textContent = isIOS && code === "zh-TW" && !hq
+    ? "這台 iPhone／iPad 沒有高品質中文語音。可到「設定 → 輔助使用 → 朗讀內容 → 聲音 → 中文（台灣）→ 美佳」下載加強版，下載後重新開啟本 App。"
+    : "每台裝置可以各自選擇；選好後按「試聽」確認。";
+}
+document.getElementById("voiceSel").onchange = e => {
+  const code = vCode();
+  if (e.target.value) settings.voices[code] = e.target.value; else delete settings.voices[code];
+  store.set("settings", settings);
+};
+document.getElementById("btnTry").onclick = () => {
+  const code = vCode();
+  const text = code === "zh-TW" ? "您好，請問今天哪裡不舒服？" : (tq(qById("cc")) || "Hello");
+  unlock(); stopAll(); tts(text, code, false);
+};
+if (hasTTS && speechSynthesis.addEventListener) speechSynthesis.addEventListener("voiceschanged", () => { if (dlg.open) paintVoices(); });
 document.getElementById("btnTest").onclick = () => say("您好，這是胸腔科問診的語音測試。", T("heroTitle").join(", "), "hero");
 document.getElementById("btnWipe").onclick = () => { dlg.close(); wipe(); };
 if (hasTTS && speechSynthesis.addEventListener) speechSynthesis.addEventListener("voiceschanged", () => { if (screen === "home") render(); });
