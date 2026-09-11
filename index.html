@@ -1,0 +1,1382 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>胸訴 — 胸腔科門診問診</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0F2233">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="胸訴">
+<style>
+/* ============================================================
+   設計代幣 —— 沿用 wanfang-* 系列（語圖）的 navy / teal / amber，
+   另加一個「紅旗」紅色，只用在需要立即處理的警示。
+   ============================================================ */
+:root{
+  --ink:#0F2233; --ink-soft:#4A5C6A;
+  --paper:#FFFFFF; --surface:#EBF0F2; --surface-2:#DCE5E8;
+  --teal:#0B6E6B; --teal-dark:#095452; --teal-tint:#E4F2F1;
+  --amber:#B45309; --amber-tint:#FFF4E5;
+  --red:#B42318; --red-tint:#FDECEA;
+  --line:#B9C7CE; --focus:#1D4ED8;
+  --step:1; --tile-min:150px; --radius:12px;
+}
+*{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body{ height:100%; }
+body{
+  margin:0; background:var(--surface); color:var(--ink);
+  font-family:"Noto Sans TC","Noto Sans CJK TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  font-size:calc(17px * var(--step)); line-height:1.55; -webkit-font-smoothing:antialiased;
+}
+button{ font-family:inherit; font-size:inherit; cursor:pointer; color:inherit; }
+:focus-visible{ outline:4px solid var(--focus); outline-offset:3px; }
+[hidden]{ display:none !important; }
+
+.app{ max-width:1080px; margin:0 auto; min-height:100%; display:flex; flex-direction:column;
+  background:var(--paper); box-shadow:0 0 0 1px var(--line); }
+
+/* ---------- 頂列 ---------- */
+.topbar{ display:flex; align-items:center; gap:10px; padding:10px 14px;
+  background:var(--ink); color:#fff; position:sticky; top:0; z-index:20; }
+.brand{ font-size:calc(21px * var(--step)); font-weight:800; letter-spacing:.08em; margin-right:auto; }
+.brand small{ display:block; font-size:calc(11px * var(--step)); font-weight:400; letter-spacing:.02em; opacity:.72; }
+.modeswitch{ display:flex; background:rgba(255,255,255,.14); border-radius:999px; padding:3px; }
+.modeswitch button{ border:0; background:transparent; color:#fff; padding:9px 16px; border-radius:999px; font-weight:700; min-height:44px; }
+.modeswitch button[aria-pressed="true"]{ background:var(--teal); }
+.iconbtn{ border:0; background:rgba(255,255,255,.14); color:#fff; width:46px; height:46px; border-radius:10px;
+  font-size:20px; display:grid; place-items:center; }
+
+/* ---------- 進度（五個階段是真正的先後順序，所以用編號） ---------- */
+.stepper{ display:flex; gap:4px; padding:10px 14px 0; background:var(--paper); }
+.stepper .st{ flex:1; text-align:center; font-size:calc(12.5px * var(--step)); font-weight:700; color:var(--ink-soft); }
+.stepper .st i{ display:block; height:6px; border-radius:3px; background:var(--surface-2); margin-bottom:5px; }
+.stepper .st.done i{ background:var(--teal); }
+.stepper .st.now{ color:var(--ink); }
+.stepper .st.now i{ background:linear-gradient(90deg,var(--teal) var(--p,50%),var(--surface-2) var(--p,50%)); }
+
+main{ flex:1; padding:16px 14px 120px; }
+
+/* ---------- 題目 ---------- */
+.qhead{ display:flex; align-items:flex-start; gap:12px; margin:4px 0 6px; }
+.qtext{ flex:1; margin:0; font-size:calc(25px * var(--step)); font-weight:800; line-height:1.4; }
+.listen{ flex:0 0 auto; border:2px solid var(--teal); background:var(--teal-tint); color:var(--teal-dark);
+  border-radius:12px; min-width:64px; min-height:60px; font-size:calc(14px * var(--step)); font-weight:800;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1.15; padding:4px 8px; }
+.listen b{ font-size:24px; }
+.qhint{ color:var(--ink-soft); margin:0 0 16px; font-size:calc(16px * var(--step)); }
+.qhint.multi::before{ content:"☑ "; color:var(--teal); font-weight:800; }
+
+/* ---------- 選項格 ---------- */
+.grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(var(--tile-min),1fr)); gap:12px; }
+.grid.wide{ --tile-min:260px; }
+.tile{ position:relative; border:3px solid var(--line); background:var(--paper); border-radius:var(--radius);
+  padding:0; overflow:hidden; min-height:150px; display:flex; flex-direction:column; text-align:center;
+  transition:transform .08s ease, border-color .12s ease; }
+.tile:active{ transform:scale(.97); }
+.tile .art{ flex:1; display:grid; place-items:center; background:var(--surface); min-height:88px; padding:8px; }
+.tile .emo{ font-size:calc(46px * var(--step)); line-height:1; }
+.tile .gly{ font-size:calc(26px * var(--step)); font-weight:800; color:var(--teal-dark); letter-spacing:.02em; }
+.tile .sw{ width:58px; height:58px; border-radius:50%; border:3px solid rgba(15,34,51,.25); }
+.tile .label{ padding:10px 8px; font-size:calc(18.5px * var(--step)); font-weight:700; line-height:1.35;
+  border-top:2px solid var(--line); }
+.tile.row{ flex-direction:row; min-height:84px; text-align:left; }
+.tile.row .art{ flex:0 0 84px; min-height:auto; }
+.tile.row .label{ border-top:0; border-left:2px solid var(--line); display:flex; align-items:center; flex:1; padding:12px 14px; }
+.tile.on{ border-color:var(--teal); }
+.tile.on .art{ background:var(--teal-tint); }
+.tile.on .label{ background:var(--teal); color:#fff; border-color:var(--teal); }
+.tile.on::after{ content:"✓"; position:absolute; top:6px; right:8px; width:34px; height:34px; border-radius:50%;
+  background:var(--teal); color:#fff; font-weight:800; font-size:20px; display:grid; place-items:center; }
+.tile.red.on{ border-color:var(--red); }
+.tile.red.on .label{ background:var(--red); border-color:var(--red); }
+.tile.red.on::after{ background:var(--red); }
+body[data-text="off"] .tile .label{ display:none; }
+
+/* ---------- 程度量表 ---------- */
+.lvls{ display:grid; gap:10px; }
+.lv{ display:flex; align-items:center; gap:14px; border:3px solid var(--line); background:var(--paper);
+  border-radius:var(--radius); padding:10px 14px; min-height:70px; font-weight:700; text-align:left;
+  font-size:calc(19px * var(--step)); }
+.lv .bar{ flex:0 0 auto; display:flex; gap:4px; }
+.lv .bar i{ width:12px; height:28px; border-radius:3px; background:var(--surface-2); }
+.lv .bar i.f{ background:var(--amber); }
+.lv.on{ border-color:var(--amber); background:var(--amber-tint); }
+
+.nrs{ display:grid; grid-template-columns:repeat(11,1fr); gap:6px; }
+.nrs button{ border:3px solid var(--line); background:var(--paper); border-radius:10px; min-height:84px;
+  padding:6px 0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+  font-size:calc(22px * var(--step)); font-weight:800; }
+.nrs button .f{ font-size:24px; height:28px; }
+.nrs button.on{ border-color:var(--amber); background:var(--amber); color:#fff; }
+.nrsends{ display:flex; justify-content:space-between; margin-top:8px; color:var(--ink-soft); font-weight:700; }
+@media (max-width:620px){
+  .nrs{ grid-template-columns:repeat(6,1fr); }
+}
+
+/* ---------- 年齡鍵盤 ---------- */
+.numpad{ max-width:420px; margin:0 auto; }
+.numshow{ text-align:center; font-size:calc(64px * var(--step)); font-weight:800; min-height:96px;
+  border:3px solid var(--line); border-radius:var(--radius); background:var(--surface); margin-bottom:12px; }
+.numshow small{ font-size:calc(26px * var(--step)); color:var(--ink-soft); margin-left:6px; }
+.keys{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+.keys button{ min-height:72px; border:2px solid var(--line); border-radius:12px; background:var(--paper);
+  font-size:calc(30px * var(--step)); font-weight:800; }
+.keys button.fn{ background:var(--surface); font-size:calc(20px * var(--step)); }
+
+/* ---------- 身體圖 ---------- */
+.bodywrap{ display:grid; grid-template-columns:minmax(0,360px) 1fr; gap:16px; align-items:start; }
+@media (max-width:700px){ .bodywrap{ grid-template-columns:1fr; } }
+.body svg{ width:100%; height:auto; display:block; }
+.body .skin{ fill:var(--surface); stroke:var(--ink-soft); stroke-width:2.5; }
+.body .rg{ fill:#fff; stroke:var(--line); stroke-width:2; cursor:pointer; }
+.body .rg:hover{ stroke:var(--teal); }
+.body .rg.on{ fill:var(--red); stroke:var(--red); fill-opacity:.85; }
+.body .rl{ font-size:15px; font-weight:800; fill:var(--ink); pointer-events:none; text-anchor:middle; }
+.body .rl.on{ fill:#fff; }
+.body .side{ font-size:14px; font-weight:800; fill:var(--ink-soft); text-anchor:middle; }
+.bodynote{ font-size:calc(14px * var(--step)); color:var(--ink-soft); margin:6px 0 0; text-align:center; }
+
+/* ---------- 文字補充 ---------- */
+.note textarea{ width:100%; min-height:160px; border:3px solid var(--line); border-radius:var(--radius);
+  padding:14px; font:inherit; font-size:calc(20px * var(--step)); }
+.mic{ display:flex; align-items:center; justify-content:center; gap:10px; width:100%; margin-top:12px;
+  min-height:76px; border:3px solid var(--teal); background:var(--teal-tint); color:var(--teal-dark);
+  border-radius:var(--radius); font-weight:800; font-size:calc(21px * var(--step)); }
+.mic.rec{ background:var(--red); border-color:var(--red); color:#fff; }
+.mic.rec b{ animation:pulse 1s infinite; }
+@keyframes pulse{ 50%{ opacity:.35; } }
+
+/* ---------- 底部導覽（大拇指可及） ---------- */
+.navbar{ position:fixed; left:0; right:0; bottom:0; z-index:15;
+  background:rgba(255,255,255,.97); border-top:2px solid var(--line);
+  padding:10px 14px calc(10px + env(safe-area-inset-bottom)); }
+.navbar .in{ max-width:1052px; margin:0 auto; display:flex; gap:10px; }
+.bigbtn{ border:3px solid transparent; border-radius:var(--radius); padding:14px 18px; min-height:66px;
+  font-weight:800; font-size:calc(20px * var(--step)); }
+.bigbtn.ok{ background:var(--teal); color:#fff; flex:2; }
+.bigbtn.ok:hover{ background:var(--teal-dark); }
+.bigbtn.ghost{ background:var(--surface); border-color:var(--line); flex:1; }
+.bigbtn.warn{ background:var(--paper); border-color:var(--amber); color:var(--amber); }
+.bigbtn.block{ display:block; width:100%; }
+
+/* ---------- 首頁 ---------- */
+.hero{ padding:10px 2px 6px; }
+.hero h1{ font-size:calc(34px * var(--step)); line-height:1.3; margin:8px 0 12px; font-weight:800; }
+.hero p{ font-size:calc(19px * var(--step)); color:var(--ink-soft); margin:0 0 20px; max-width:34em; }
+.how{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:0 0 24px; }
+.how div{ background:var(--surface); border-radius:var(--radius); padding:14px 10px; text-align:center; font-weight:700; }
+.how div b{ display:block; font-size:40px; line-height:1.2; margin-bottom:4px; }
+.startbtn{ width:100%; min-height:88px; font-size:calc(26px * var(--step)); }
+.homeactions{ display:grid; gap:12px; }
+
+/* ---------- 總覽（病人看） ---------- */
+.revsec h2{ font-size:calc(19px * var(--step)); margin:22px 0 8px; padding-bottom:6px; border-bottom:2px solid var(--surface-2); }
+.revrow{ display:flex; gap:12px; align-items:center; width:100%; text-align:left; border:2px solid var(--line);
+  background:var(--paper); border-radius:10px; padding:12px 14px; margin-bottom:8px; }
+.revrow .k{ flex:0 0 7.5em; color:var(--ink-soft); font-weight:700; font-size:calc(15px * var(--step)); }
+.revrow .v{ flex:1; font-weight:700; }
+.revrow .v.empty{ color:var(--amber); }
+.revrow .ed{ color:var(--teal-dark); font-weight:800; font-size:calc(14px * var(--step)); }
+.saybox{ border:3px solid var(--teal); background:var(--teal-tint); border-radius:var(--radius); padding:16px 18px;
+  font-size:calc(21px * var(--step)); font-weight:700; line-height:1.75; margin-bottom:14px; }
+.saybox p{ margin:0 0 6px; }
+
+/* ---------- 醫師摘要 ---------- */
+.doc h2{ font-size:calc(18px * var(--step)); margin:22px 0 8px; display:flex; align-items:baseline; gap:10px; }
+.doc h2 small{ font-weight:500; color:var(--ink-soft); font-size:calc(13px * var(--step)); }
+.pt{ display:flex; flex-wrap:wrap; gap:8px 18px; font-size:calc(20px * var(--step)); font-weight:800;
+  padding:12px 14px; background:var(--surface); border-radius:10px; }
+.pt span{ font-weight:500; color:var(--ink-soft); font-size:calc(15px * var(--step)); }
+.flags{ display:grid; gap:8px; }
+.flag{ border-left:6px solid; border-radius:0 10px 10px 0; padding:10px 14px; font-weight:700; }
+.flag.red{ border-color:var(--red); background:var(--red-tint); color:#7A1A12; }
+.flag.amber{ border-color:var(--amber); background:var(--amber-tint); color:#6B3406; }
+.flag.info{ border-color:var(--teal); background:var(--teal-tint); color:var(--teal-dark); }
+.flag small{ display:block; font-weight:500; margin-top:2px; }
+.cc{ display:flex; flex-wrap:wrap; gap:8px; }
+.cc span{ background:var(--ink); color:#fff; border-radius:999px; padding:6px 14px; font-weight:800; }
+.grp{ border:2px solid var(--line); border-radius:12px; margin-bottom:12px; overflow:hidden; }
+.grp > header{ background:var(--surface); padding:10px 14px; display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.grp > header b{ font-size:calc(18px * var(--step)); margin-right:auto; }
+.dim{ font-size:calc(12.5px * var(--step)); font-weight:800; border-radius:6px; padding:2px 7px; }
+.dim.y{ background:var(--teal); color:#fff; }
+.dim.n{ background:var(--paper); color:var(--amber); border:1.5px dashed var(--amber); }
+.kv{ display:grid; grid-template-columns:9.5em 1fr; gap:0; margin:0; }
+.kv dt, .kv dd{ padding:8px 14px; border-top:1px solid var(--surface-2); margin:0; }
+.kv dt{ color:var(--ink-soft); font-weight:700; font-size:calc(15px * var(--step)); }
+.kv dd{ font-weight:600; }
+.kv dd.miss{ color:var(--amber); font-weight:700; }
+.kv dd .r{ color:var(--red); font-weight:800; }
+.asks{ padding:8px 14px 12px; border-top:1px solid var(--surface-2); background:#FAFCFC; }
+.asks p{ margin:4px 0 6px; font-size:calc(13.5px * var(--step)); color:var(--ink-soft); font-weight:700; }
+.asks label{ display:flex; gap:10px; align-items:flex-start; padding:5px 0; font-size:calc(15.5px * var(--step)); cursor:pointer; }
+.asks input{ width:22px; height:22px; margin-top:2px; accent-color:var(--teal); flex:0 0 auto; }
+.docactions{ display:flex; flex-wrap:wrap; gap:10px; margin-top:22px; }
+.docactions .bigbtn{ flex:1 1 180px; }
+.disclaim{ font-size:calc(13px * var(--step)); color:var(--ink-soft); margin-top:14px; }
+
+/* ---------- 紅旗警示 ---------- */
+.alert{ position:fixed; inset:0; z-index:60; background:rgba(15,34,51,.62); display:grid; place-items:center; padding:18px; }
+.alert .card{ background:var(--paper); border-radius:16px; max-width:480px; width:100%; overflow:hidden;
+  box-shadow:0 24px 60px rgba(15,34,51,.4); }
+.alert .card header{ background:var(--red); color:#fff; padding:18px 20px; font-size:calc(26px * var(--step)); font-weight:800; }
+.alert .card div{ padding:18px 20px 20px; font-size:calc(21px * var(--step)); font-weight:700; }
+.alert .card .bigbtn{ width:100%; margin-top:16px; background:var(--red); color:#fff; }
+
+.said{ position:fixed; left:50%; bottom:110px; transform:translateX(-50%); background:var(--ink); color:#fff;
+  padding:12px 24px; border-radius:14px; font-size:calc(21px * var(--step)); font-weight:800;
+  box-shadow:0 10px 30px rgba(15,34,51,.34); z-index:40; max-width:90vw; text-align:center; }
+
+/* ---------- 設定 ---------- */
+dialog{ border:0; border-radius:14px; padding:0; width:min(460px,92vw); box-shadow:0 24px 60px rgba(15,34,51,.3); }
+dialog::backdrop{ background:rgba(15,34,51,.5); }
+.dlg-head{ background:var(--ink); color:#fff; padding:16px 20px; font-weight:800; font-size:calc(19px * var(--step)); }
+.dlg-body{ padding:18px 20px 22px; display:grid; gap:18px; max-height:78vh; overflow:auto; }
+.field > span{ display:block; font-weight:700; margin-bottom:8px; }
+.seg{ display:flex; gap:8px; flex-wrap:wrap; }
+.seg button{ flex:1; border:2px solid var(--line); background:var(--paper); padding:12px 8px; border-radius:9px;
+  font-weight:700; min-height:50px; }
+.seg button[aria-pressed="true"]{ background:var(--teal); color:#fff; border-color:var(--teal); }
+.fnote{ margin:6px 0 0; font-size:calc(13px * var(--step)); color:var(--ink-soft); }
+
+footer{ padding:16px 14px 110px; text-align:center; color:var(--ink-soft); font-size:calc(13px * var(--step));
+  line-height:1.6; border-top:1px solid var(--line); }
+.notice{ font-weight:700; color:var(--amber); }
+
+@media (prefers-reduced-motion:reduce){ *{ transition:none !important; animation:none !important; } }
+
+@media print{
+  .topbar,.stepper,.navbar,footer,.docactions,.said,.asks input{ display:none !important; }
+  main{ padding:0; } body{ background:#fff; font-size:12pt; } .app{ box-shadow:none; }
+  .grp{ break-inside:avoid; }
+}
+</style>
+</head>
+<body data-text="on">
+
+<div class="app">
+  <header class="topbar">
+    <div class="brand">胸訴<small>胸腔科門診問診・研發測試版</small></div>
+    <div class="modeswitch" role="group" aria-label="模式">
+      <button id="mPt"  aria-pressed="true">病人</button>
+      <button id="mDoc" aria-pressed="false">醫師</button>
+    </div>
+    <button class="iconbtn" id="btnSet" aria-label="設定">⚙</button>
+  </header>
+  <div class="stepper" id="stepper" hidden></div>
+  <main id="view"></main>
+  <footer>
+    <span class="notice">研發測試中，非醫療器材</span><br>
+    本程式只協助病人整理症狀與病史，不做診斷。所有資料僅存在這台裝置，不會上傳。<br>
+    若胸痛、大量咳血或非常喘，請不要等待，立即告訴護理人員。
+  </footer>
+</div>
+
+<nav class="navbar" id="navbar" hidden><div class="in">
+  <button class="bigbtn ghost" id="btnPrev">上一題</button>
+  <button class="bigbtn ok" id="btnNext">下一題</button>
+</div></nav>
+
+<div class="said" id="said" hidden aria-live="polite"></div>
+
+<div class="alert" id="alert" hidden role="alertdialog" aria-labelledby="alertHead">
+  <div class="card">
+    <header id="alertHead">⚠ 請馬上告訴護理師</header>
+    <div><span id="alertText"></span>
+      <button class="bigbtn" id="alertOk">我知道了，繼續填寫</button></div>
+  </div>
+</div>
+
+<dialog id="dlg">
+  <div class="dlg-head">設定</div>
+  <div class="dlg-body">
+    <div class="field"><span>字級</span>
+      <div class="seg" data-set="step">
+        <button data-v="1">標準</button><button data-v="1.15">大</button><button data-v="1.3">特大</button>
+      </div></div>
+    <div class="field"><span>進入每一題時自動唸題目</span>
+      <div class="seg" data-set="autoread">
+        <button data-v="on">唸</button><button data-v="off">不唸</button>
+      </div></div>
+    <div class="field"><span>語音語言</span>
+      <div class="seg" data-set="lang">
+        <button data-v="zh">華語</button><button data-v="nan">台語（錄音）</button>
+      </div>
+      <p class="fnote" id="langNote"></p></div>
+    <div class="field"><span>語速</span>
+      <div class="seg" data-set="rate">
+        <button data-v="0.72">慢</button><button data-v="0.88">標準</button>
+      </div></div>
+    <div class="field"><span>選項文字</span>
+      <div class="seg" data-set="text">
+        <button data-v="on">顯示文字</button><button data-v="off">只看圖示</button>
+      </div></div>
+    <button class="bigbtn ghost block" id="btnTest">測試語音</button>
+    <p class="fnote" id="voiceInfo" style="margin-top:-8px"></p>
+    <button class="bigbtn warn block" id="btnWipe">清除這台裝置上的所有填答</button>
+    <button class="bigbtn ok block" id="btnClose">完成</button>
+  </div>
+</dialog>
+
+<script>
+"use strict";
+/* ============================================================
+   1. 問診題庫
+   ------------------------------------------------------------
+   架構比照「語圖」：資料與介面分離，改題目只動這一段。
+   每一題：
+     id    唯一代號（也是台語錄音檔名 assets/audio/nan/{id}.mp3）
+     sec   階段 basic / cc / detail / history
+     grp   主訴群組（醫師摘要依此分組）
+     lq    LQQOPERA 維度：L 位置、Q 性質、N 程度、O 發作與病程、
+           P 誘發、E 加重緩解、R 放射、A 伴隨
+     type  single 單選 / multi 複選 / lvl 五級 / nrs 0–10 /
+           num 數字 / body 身體圖 / text 文字＋語音輸入
+     when  顯示條件（依前面的答案）
+     ps    病人版句子，{} 代入所選文字
+     dl    醫師摘要的欄位名
+   選項：
+     o(值, 病人看的字, 圖示, {dx 醫師用詞, flag red|amber, alert 立即提醒,
+                               none 互斥「都沒有」, ps 個別句子, g 文字圖, sw 色塊})
+   ============================================================ */
+function o(v, label, ic, ext){ return Object.assign({ v, label, ic }, ext || {}); }
+const NONE = (label, ps) => o("none", label, "⭕", { none:true, ps, dx:"無" });
+
+const has = (a, id, v) => Array.isArray(a[id]) ? a[id].includes(v) : a[id] === v;
+const cc  = (a, v) => has(a, "cc", v);
+const anyCC = (a, list) => list.some(v => cc(a, v));
+
+const SECTIONS = [
+  { id:"basic",   name:"基本資料" },
+  { id:"cc",      name:"主要症狀" },
+  { id:"detail",  name:"症狀細節" },
+  { id:"history", name:"過去病史" },
+  { id:"review",  name:"確認" }
+];
+
+const GROUPS = {
+  cough:  { name:"咳嗽 Cough",
+            ask:["最近一次感冒或上呼吸道感染是什麼時候","是否服用 ACEI（-pril 類降壓藥）","有無聲音沙啞、吞嚥困難","夜咳是否影響睡眠"] },
+  sputum: { name:"咳痰 Sputum",
+            ask:["痰是否有異味","能否留痰送檢（抗酸菌抹片／培養）"] },
+  hemo:   { name:"咳血 Hemoptysis",
+            ask:["估計單次與 24 小時出血量","抗凝血／抗血小板藥物使用","排除鼻咽、口腔或上消化道出血來源","生命徵象與 SpO₂"] },
+  dysp:   { name:"呼吸困難 Dyspnea",
+            ask:["SpO₂ 與呼吸速率","過去一年急性惡化、急診或住院次數","吸入劑使用技巧與規則使用情形","有無心悸、下肢水腫（心因性鑑別）"] },
+  cp:     { name:"胸痛／胸悶 Chest pain",
+            ask:["胸悶合併危險徵象時評估是否立即做心電圖","心血管危險因子","近期長途旅行、手術、臥床（肺栓塞風險）","外傷史"] },
+  sys:    { name:"全身症狀 Systemic",
+            ask:["發燒持續天數與熱型","實際體重與變化數字"] },
+  sleep:  { name:"睡眠 Sleep",
+            ask:["頸圍、BMI、血壓（STOP-BANG）","是否曾因打瞌睡發生交通事故"] },
+  nodule: { name:"影像異常 Imaging finding",
+            ask:["調閱原始影像並與既往影像比對","報告中的結節大小、實性程度與位置"] }
+};
+
+const Q = [
+  /* ---------- 基本資料 ---------- */
+  { id:"age", sec:"basic", type:"num", q:"請問您今年幾歲？", short:"年齡", unit:"歲", dl:"年齡", ps:"我今年{}歲。" },
+  { id:"sex", sec:"basic", type:"single", q:"請問您的性別？", short:"性別", dl:"性別", ps:"我是{}性。",
+    opts:[ o("m","男","👨"), o("f","女","👩") ] },
+  { id:"visit", sec:"basic", type:"single", q:"這次來看診是？", short:"就診類型", dl:"就診類型", ps:"這次是{}。", row:true,
+    opts:[ o("new","第一次來看這個問題","🆕",{dx:"初次就診此問題"}),
+           o("fu","回診追蹤","🔁",{dx:"回診追蹤"}),
+           o("report","拿健檢或其他醫院的報告來","📄",{dx:"攜帶健檢／外院報告"}) ] },
+
+  /* ---------- 主訴 ---------- */
+  { id:"cc", sec:"cc", type:"multi", q:"今天哪裡不舒服？", hint:"可以選很多個", short:"主要症狀", dl:"主訴", ps:"我今天來看{}。",
+    opts:[ o("cough","咳嗽","😷",{dx:"咳嗽 Cough"}),
+           o("sputum","有痰","🧻",{dx:"咳痰 Sputum"}),
+           o("hemo","咳血、痰裡有血","🩸",{dx:"咳血 Hemoptysis"}),
+           o("dysp","喘、呼吸困難","😮‍💨",{dx:"呼吸困難 Dyspnea"}),
+           o("cp","胸痛、胸悶","🫁",{dx:"胸痛／胸悶 Chest pain"}),
+           o("fever","發燒","🌡️",{dx:"發燒 Fever"}),
+           o("weight","體重變輕、很容易累","⚖️",{dx:"體重減輕／倦怠"}),
+           o("sleep","打呼、睡不好","😴",{dx:"打鼾／睡眠問題"}),
+           o("nodule","檢查發現肺部有結節或白點","🩻",{dx:"影像發現肺結節"}),
+           o("other","其他","✏️",{dx:"其他"}) ] },
+
+  /* ---------- 咳嗽 ---------- */
+  { id:"cough_dur", sec:"detail", grp:"cough", lq:"O", type:"single", when:a=>cc(a,"cough"),
+    q:"咳嗽多久了？", short:"咳多久", dl:"病程", ps:"我咳嗽{}了。",
+    opts:[ o("lt2","不到 2 週",null,{g:"<2週", dx:"< 2 週"}),
+           o("2to3","2 到 3 週",null,{g:"2–3週", dx:"2–3 週"}),
+           o("3to8","3 週到 2 個月",null,{g:"3–8週", dx:"3–8 週（亞急性）"}),
+           o("gt8","超過 2 個月",null,{g:">2月", dx:"> 8 週（慢性）"}) ] },
+  { id:"cough_type", sec:"detail", grp:"cough", lq:"Q", type:"single", when:a=>cc(a,"cough"),
+    q:"是乾咳，還是有痰的咳嗽？", short:"咳嗽型態", dl:"性質", ps:"是{}。",
+    opts:[ o("dry","乾咳，沒有痰",null,{g:"乾", dx:"乾咳"}),
+           o("wet","有痰的咳嗽","🧻",{dx:"濕咳（有痰）"}) ] },
+  { id:"cough_time", sec:"detail", grp:"cough", lq:"O", type:"multi", when:a=>cc(a,"cough"),
+    q:"什麼時候最容易咳？", hint:"可以選很多個", short:"咳嗽時段", dl:"好發時段", ps:"{}比較容易咳。",
+    opts:[ o("day","白天","☀️",{dx:"白天"}), o("night","晚上","🌙",{dx:"夜間"}),
+           o("lying","躺下睡覺時","🛏️",{dx:"臥姿"}), o("morning","早上起床時","🌅",{dx:"晨起"}),
+           o("all","整天都會","🔁",{dx:"整天", ps:"整天都會咳。"}) ] },
+  { id:"cough_trig", sec:"detail", grp:"cough", lq:"P", type:"multi", when:a=>cc(a,"cough"),
+    q:"什麼情況下會咳得更厲害？", hint:"可以選很多個", short:"誘發因素", dl:"誘發因子", ps:"{}會咳得更厲害。",
+    opts:[ o("cold","吹冷風或冷氣","🌬️",{dx:"冷空氣"}), o("ice","吃冰或喝冷飲","🧊",{dx:"冰冷飲食"}),
+           o("exer","運動後","🏃",{dx:"運動後"}), o("talk","大笑或講話","😂",{dx:"說話／大笑"}),
+           o("smell","聞到煙味、油煙或香水","🌫️",{dx:"刺激性氣味"}), o("season","季節變換","🍂",{dx:"季節變化"}),
+           NONE("沒有特別的原因","沒有特別會讓咳嗽變厲害的情況。") ] },
+  { id:"cough_assoc", sec:"detail", grp:"cough", lq:"A", type:"multi", when:a=>cc(a,"cough"),
+    q:"咳嗽時還有沒有這些情況？", hint:"可以選很多個", short:"伴隨症狀", dl:"伴隨症狀", ps:"咳嗽時還會{}。",
+    opts:[ o("wheeze","有咻咻的喘鳴聲","🎐",{dx:"喘鳴 wheezing"}),
+           o("pnd","鼻涕倒流到喉嚨","👃",{dx:"鼻涕倒流（UACS?）"}),
+           o("gerd","胸口灼熱、胃酸逆流","🔥",{dx:"胃酸逆流症狀"}),
+           o("itch","喉嚨癢","🗣️",{dx:"喉嚨癢"}),
+           o("hoarse","聲音沙啞","🔇",{dx:"聲音沙啞"}),
+           NONE("都沒有","咳嗽時沒有其他伴隨的症狀。") ] },
+  { id:"cough_sev", sec:"detail", grp:"cough", lq:"N", type:"lvl", when:a=>cc(a,"cough"),
+    q:"咳嗽對您的生活影響多大？", short:"咳嗽嚴重度", dl:"嚴重度", ps:"咳嗽的影響是：{}。",
+    opts:[ o(1,"有一點點",null,{dx:"1/5"}), o(2,"有一些",null,{dx:"2/5"}), o(3,"中等",null,{dx:"3/5"}),
+           o(4,"很嚴重",null,{dx:"4/5"}), o(5,"嚴重到影響睡覺或工作",null,{dx:"5/5（影響睡眠／工作）"}) ] },
+
+  /* ---------- 咳痰 ---------- */
+  { id:"sp_color", sec:"detail", grp:"sputum", lq:"Q", type:"single",
+    when:a=>cc(a,"sputum") || has(a,"cough_type","wet"),
+    q:"痰是什麼顏色？", short:"痰的顏色", dl:"顏色", ps:"痰的顏色是{}。",
+    opts:[ o("white","白色或透明",null,{sw:"#F5F7F7", dx:"白色／透明"}),
+           o("yellow","黃色",null,{sw:"#E8C547", dx:"黃色"}),
+           o("green","綠色",null,{sw:"#7FA54A", dx:"綠色"}),
+           o("rust","鐵鏽色、咖啡色",null,{sw:"#8B4A2B", dx:"鐵鏽色／棕色"}),
+           o("blood","帶血",null,{sw:"#B42318", dx:"帶血", flag:"amber"}) ] },
+  { id:"sp_thick", sec:"detail", grp:"sputum", lq:"Q", type:"single",
+    when:a=>cc(a,"sputum") || has(a,"cough_type","wet"),
+    q:"痰是稀的，還是黏的？", short:"痰的質地", dl:"質地", ps:"痰{}。",
+    opts:[ o("thin","稀稀水水的","💧",{dx:"稀薄"}), o("thick","黏稠、不容易咳出來","🍯",{dx:"黏稠"}) ] },
+  { id:"sp_amt", sec:"detail", grp:"sputum", lq:"N", type:"single",
+    when:a=>cc(a,"sputum") || has(a,"cough_type","wet"),
+    q:"一天大約咳出多少痰？", short:"痰量", dl:"量", ps:"一天的痰量是{}。",
+    opts:[ o("s","一點點（少於 1 湯匙）","🥄",{dx:"少量（< 1 湯匙）"}),
+           o("m","一些（幾湯匙）","🥄🥄",{dx:"中量（數湯匙）"}),
+           o("l","很多（超過半杯）","🥛",{dx:"大量（> 半杯）", flag:"amber"}) ] },
+  { id:"sp_time", sec:"detail", grp:"sputum", lq:"O", type:"single",
+    when:a=>cc(a,"sputum") || has(a,"cough_type","wet"),
+    q:"什麼時候痰最多？", short:"痰多時段", dl:"好發時段", ps:"{}痰最多。",
+    opts:[ o("morning","早上起床時","🌅",{dx:"晨起最多"}), o("lying","躺下時","🛏️",{dx:"臥姿時"}),
+           o("same","整天都差不多","🔁",{dx:"整天相近", ps:"整天的痰量都差不多。"}) ] },
+
+  /* ---------- 咳血 ---------- */
+  { id:"hm_form", sec:"detail", grp:"hemo", lq:"Q", type:"single",
+    when:a=>cc(a,"hemo") || has(a,"sp_color","blood"),
+    q:"咳出來的血是什麼樣子？", short:"血的樣子", dl:"型態", ps:"咳出來的血是{}。",
+    opts:[ o("streak","痰裡有血絲",null,{g:"血絲", dx:"痰中帶血絲", flag:"amber"}),
+           o("frank","整口鮮血","🩸",{dx:"整口鮮血", flag:"red", alert:true}),
+           o("clot","血塊",null,{g:"血塊", dx:"血塊", flag:"red", alert:true}) ] },
+  { id:"hm_src", sec:"detail", grp:"hemo", lq:"L", type:"single",
+    when:a=>cc(a,"hemo") || has(a,"sp_color","blood"),
+    q:"血是怎麼出來的？", short:"血從哪裡來", dl:"來源", ps:"血是{}。", row:true,
+    opts:[ o("cough","咳嗽咳出來的","😷",{dx:"咳出（符合咳血）"}),
+           o("nose","從鼻子流下來的","👃",{dx:"鼻腔倒流？"}),
+           o("vomit","嘔吐吐出來的","🤮",{dx:"嘔出（需鑑別吐血）", flag:"amber"}),
+           o("unsure","不確定","❓",{dx:"來源不確定", ps:"我不確定血是從哪裡來的。"}) ] },
+  { id:"hm_freq", sec:"detail", grp:"hemo", lq:"N", type:"single",
+    when:a=>cc(a,"hemo") || has(a,"sp_color","blood"),
+    q:"咳血多常發生？", short:"咳血頻率", dl:"頻率", ps:"咳血{}。",
+    opts:[ o("once","只有一次",null,{g:"1次", dx:"僅一次"}),
+           o("some","偶爾幾次",null,{g:"偶爾", dx:"偶發數次"}),
+           o("every","每次咳嗽都有",null,{g:"每次", dx:"每次咳嗽皆有", flag:"amber", ps:"每次咳嗽都有血。"}) ] },
+  { id:"hm_last", sec:"detail", grp:"hemo", lq:"O", type:"single",
+    when:a=>cc(a,"hemo") || has(a,"sp_color","blood"),
+    q:"最近一次咳血是什麼時候？", short:"最近一次", dl:"最近一次", ps:"最近一次咳血是{}。",
+    opts:[ o("today","今天",null,{g:"今天", dx:"今日"}),
+           o("days","這幾天",null,{g:"這幾天", dx:"數日內"}),
+           o("week","一週以前",null,{g:">1週", dx:"一週以前"}) ] },
+
+  /* ---------- 呼吸困難 ---------- */
+  { id:"dy_onset", sec:"detail", grp:"dysp", lq:"O", type:"single", when:a=>cc(a,"dysp"),
+    q:"喘是怎麼開始的？", short:"喘怎麼開始", dl:"發作速度", ps:"喘是{}。", row:true,
+    opts:[ o("sudden","突然發生的（幾分鐘到幾小時內）","⚡",{dx:"急性發作（分鐘–小時）", flag:"red", alert:true}),
+           o("days","這幾天才開始","📅",{dx:"數日內"}),
+           o("slow","幾週到幾個月慢慢變嚴重","📈",{dx:"數週–數月漸進"}) ] },
+  { id:"dy_level", sec:"detail", grp:"dysp", lq:"N", type:"single", when:a=>cc(a,"dysp"),
+    q:"做什麼事的時候會喘？", hint:"選最接近您的情況", short:"喘的程度", dl:"活動耐受（mMRC）", ps:"{}。", row:true,
+    opts:[ o(0,"只有劇烈運動才會喘","🏋️",{dx:"mMRC 0"}),
+           o(1,"快走或爬坡時會喘","⛰️",{dx:"mMRC 1"}),
+           o(2,"平地走路比同年紀的人慢，或要停下來喘氣","🚶",{dx:"mMRC 2"}),
+           o(3,"走大約 100 公尺或幾分鐘，就要停下來喘","🧍",{dx:"mMRC 3"}),
+           o(4,"喘到不能出門，穿衣服、洗澡也會喘","🛁",{dx:"mMRC 4", flag:"amber"}) ] },
+  { id:"dy_pos", sec:"detail", grp:"dysp", lq:"E", type:"multi", when:a=>cc(a,"dysp"),
+    q:"躺下或睡覺的時候會喘嗎？", hint:"可以選很多個", short:"躺下時", dl:"姿勢／夜間", ps:"{}。", join:"，",
+    opts:[ o("ortho","躺平會喘，要墊高枕頭或坐起來","🛏️",{dx:"端坐呼吸 orthopnea"}),
+           o("pnd","半夜會喘醒","🌙",{dx:"夜間陣發性呼吸困難 PND"}),
+           NONE("都不會","躺下和睡覺時不會喘。") ] },
+  { id:"dy_relief", sec:"detail", grp:"dysp", lq:"E", type:"multi", when:a=>cc(a,"dysp"),
+    q:"怎麼樣會比較不喘？", hint:"可以選很多個", short:"緩解方式", dl:"緩解因子", ps:"喘的時候，{}。",
+    opts:[ o("rest","休息一下就會好","🪑",{dx:"休息緩解"}),
+           o("sit","坐起來比較舒服","🧘",{dx:"坐姿緩解"}),
+           o("inhaler","用吸入劑（噴劑）會好","💨",{dx:"吸入劑可緩解"}),
+           o("no","都不太會好轉","❌",{dx:"無明顯緩解", ps:"喘的時候，怎麼做都不太會好轉。"}) ] },
+  { id:"dy_assoc", sec:"detail", grp:"dysp", lq:"A", type:"multi", when:a=>cc(a,"dysp"),
+    q:"喘的時候還有沒有這些情況？", hint:"可以選很多個", short:"伴隨症狀", dl:"伴隨症狀", ps:"喘的時候還{}。",
+    opts:[ o("wheeze","有咻咻的喘鳴聲","🎐",{dx:"喘鳴"}),
+           o("edema","腳會腫","🦶",{dx:"下肢水腫"}),
+           o("cyan","嘴唇或手指發紫","💜",{dx:"發紺", flag:"red", alert:true}),
+           o("palp","心跳很快","💓",{dx:"心悸"}),
+           NONE("都沒有","喘的時候沒有其他伴隨的症狀。") ] },
+
+  /* ---------- 胸痛 ---------- */
+  { id:"cp_loc", sec:"detail", grp:"cp", lq:"L", type:"body", when:a=>cc(a,"cp"),
+    q:"哪裡痛？請點身體圖", hint:"可以點很多個地方", short:"痛的位置", dl:"位置", ps:"痛的位置在{}。",
+    opts:[ o("rchest","右胸",null,{dx:"右前胸", shape:"rchest"}),
+           o("center","胸口中間",null,{dx:"胸骨後", shape:"center"}),
+           o("lchest","左胸",null,{dx:"左前胸", shape:"lchest"}),
+           o("rside","右側肋骨",null,{dx:"右側胸壁", shape:"rside"}),
+           o("epi","心窩",null,{dx:"上腹／心窩", shape:"epi"}),
+           o("lside","左側肋骨",null,{dx:"左側胸壁", shape:"lside"}),
+           o("back","背部",null,{g:"背", dx:"背部"}),
+           o("diffuse","整個胸口，說不出位置","🫁",{dx:"瀰漫、無法定位", ps:"整個胸口都不舒服，說不出確切位置。"}) ] },
+  { id:"cp_quality", sec:"detail", grp:"cp", lq:"Q", type:"single", when:a=>cc(a,"cp"),
+    q:"痛起來是什麼感覺？", short:"痛的感覺", dl:"性質", ps:"痛起來{}。", row:true,
+    opts:[ o("press","悶悶的，像被石頭壓住","🪨",{dx:"壓迫性悶痛", flag:"amber"}),
+           o("stab","像針刺的刺痛","📍",{dx:"刺痛"}),
+           o("tear","像被撕裂一樣","⚡",{dx:"撕裂痛", flag:"red", alert:true}),
+           o("burn","燒燒熱熱的","🔥",{dx:"灼熱感"}),
+           o("pleur","一吸氣就抽痛","😣",{dx:"吸氣時抽痛（肋膜性？）"}) ] },
+  { id:"cp_resp", sec:"detail", grp:"cp", lq:"E", type:"multi", when:a=>cc(a,"cp"),
+    q:"什麼時候會更痛？", hint:"可以選很多個", short:"加重因素", dl:"加重因子", ps:"{}會更痛。",
+    opts:[ o("breath","深呼吸時","🌬️",{dx:"深吸氣"}), o("cough","咳嗽時","😷",{dx:"咳嗽"}),
+           o("move","轉身或按壓時","🔄",{dx:"轉身／壓痛（肌肉骨骼？）"}),
+           o("exert","走路或活動時","🚶",{dx:"活動誘發（勞力性）", flag:"amber"}),
+           NONE("都沒有關係","痛跟呼吸、動作都沒有關係。") ] },
+  { id:"cp_rad", sec:"detail", grp:"cp", lq:"R", type:"multi", when:a=>cc(a,"cp"),
+    q:"痛會不會跑到別的地方？", hint:"可以選很多個", short:"痛會跑到", dl:"放射", ps:"痛會跑到{}。",
+    opts:[ o("neck","脖子",null,{g:"頸", dx:"頸部"}),
+           o("jaw","下巴",null,{g:"顎", dx:"下顎", flag:"red", alert:true}),
+           o("larm","左肩或左手臂","💪",{dx:"左肩／左上肢", flag:"red", alert:true}),
+           o("back","背後",null,{g:"背", dx:"背部", flag:"amber"}),
+           NONE("不會","痛不會跑到別的地方。") ] },
+  { id:"cp_dur", sec:"detail", grp:"cp", lq:"O", type:"single", when:a=>cc(a,"cp"),
+    q:"每次痛多久？", short:"每次痛多久", dl:"每次持續", ps:"每次痛{}。",
+    opts:[ o("sec","幾秒鐘",null,{g:"秒", dx:"數秒"}),
+           o("min","幾分鐘",null,{g:"分", dx:"數分鐘"}),
+           o("long","超過 20 分鐘",null,{g:">20分", dx:"> 20 分鐘", flag:"red", alert:true}),
+           o("const","一直痛，沒有停",null,{g:"持續", dx:"持續不緩解", flag:"amber", ps:"一直在痛，沒有停過。"}) ] },
+  { id:"cp_danger", sec:"detail", grp:"cp", lq:"A", type:"multi", when:a=>cc(a,"cp"),
+    q:"痛的時候有沒有這些情況？", hint:"可以選很多個", short:"危險徵象", dl:"伴隨／危險徵象", ps:"痛的時候還會{}。",
+    opts:[ o("sweat","冒冷汗","💦",{dx:"冒冷汗", flag:"red", alert:true}),
+           o("pale","臉色發白","😶",{dx:"臉色蒼白", flag:"red", alert:true}),
+           o("faint","頭暈、快昏倒","😵",{dx:"頭暈／近乎暈厥", flag:"red", alert:true}),
+           o("sob","喘不過氣","😮‍💨",{dx:"呼吸困難"}),
+           o("palp","心跳很快","💓",{dx:"心悸"}),
+           NONE("都沒有","痛的時候沒有冒冷汗、頭暈這些情況。") ] },
+  { id:"cp_nrs", sec:"detail", grp:"cp", lq:"N", type:"nrs", when:a=>cc(a,"cp"),
+    q:"最痛的時候，有幾分痛？", hint:"0 分是不痛，10 分是痛到受不了", short:"疼痛分數", dl:"疼痛 NRS", ps:"最痛的時候是{}分。" },
+
+  /* ---------- 全身症狀 ---------- */
+  { id:"sy_fever", sec:"detail", grp:"sys", lq:"N", type:"single", when:a=>cc(a,"fever"),
+    q:"有量過體溫嗎？", short:"體溫", dl:"發燒", ps:"我{}。", row:true,
+    opts:[ o("measured","有量過，38 度以上","🌡️",{dx:"實測 ≥ 38°C"}),
+           o("feel","覺得熱熱的，但沒有量","🥵",{dx:"自覺發熱（未測量）"}),
+           o("no","沒有發燒","⭕",{dx:"無發燒"}) ] },
+  { id:"sy_multi", sec:"detail", grp:"sys", lq:"A", type:"multi",
+    when:a=>anyCC(a,["cough","sputum","hemo","fever","weight","nodule"]),
+    q:"最近有沒有這些情況？", hint:"可以選很多個", short:"全身症狀", dl:"系統性症狀", ps:"最近還有{}。",
+    opts:[ o("chill","發冷、發抖","🥶",{dx:"畏寒"}),
+           o("sweat","晚上睡覺流很多汗","💦",{dx:"夜間盜汗", flag:"amber"}),
+           o("anorexia","沒有食慾","🍚",{dx:"食慾不振"}),
+           o("fatigue","很容易累","🥱",{dx:"倦怠"}),
+           NONE("都沒有","最近沒有發冷、盜汗、食慾差或容易累。") ] },
+  { id:"sy_wt", sec:"detail", grp:"sys", lq:"N", type:"single",
+    when:a=>anyCC(a,["cough","sputum","hemo","fever","weight","nodule"]),
+    q:"過去 3 到 6 個月，沒有刻意減肥，體重有沒有變輕？", short:"體重變化", dl:"非刻意體重減輕",
+    ps:"過去半年，沒有刻意減肥，體重{}。", row:true,
+    opts:[ o("0","沒有變",null,{g:"±0", dx:"無"}),
+           o("1-3","掉了 1 到 3 公斤",null,{g:"−1~3", dx:"約 1–3 kg"}),
+           o("3-5","掉了 3 到 5 公斤",null,{g:"−3~5", dx:"約 3–5 kg", flag:"amber"}),
+           o("gt5","掉了超過 5 公斤",null,{g:"−5+", dx:"> 5 kg", flag:"amber"}),
+           o("unk","不清楚",null,{g:"?", dx:"不清楚", ps:"我不清楚體重有沒有變。"}) ] },
+
+  /* ---------- 睡眠 ---------- */
+  { id:"sl_sym", sec:"detail", grp:"sleep", lq:"A", type:"multi", when:a=>cc(a,"sleep"),
+    q:"睡覺方面有沒有這些情況？", hint:"可以選很多個", short:"睡眠症狀", dl:"睡眠症狀", ps:"睡覺方面：{}。",
+    opts:[ o("snore","打呼很大聲","😪",{dx:"大聲打鼾"}),
+           o("apnea","別人說我睡覺會停止呼吸","🫢",{dx:"目擊呼吸中止"}),
+           o("sleepy","白天很想睡、容易秒睡","🥱",{dx:"日間嗜睡"}),
+           o("headache","早上起床會頭痛","🤕",{dx:"晨起頭痛"}),
+           o("unrest","睡很久還是覺得沒睡飽","😩",{dx:"睡眠無恢復感"}) ] },
+  { id:"sl_drive", sec:"detail", grp:"sleep", lq:"N", type:"single", when:a=>cc(a,"sleep"),
+    q:"開車或坐著的時候，會不會打瞌睡？", short:"打瞌睡", dl:"開車／靜坐瞌睡", ps:"開車或坐著時，{}。",
+    opts:[ o("often","常常會",null,{g:"常常", dx:"經常", flag:"amber", ps:"開車或坐著時常常會打瞌睡。"}),
+           o("some","偶爾會",null,{g:"偶爾", dx:"偶爾"}),
+           o("never","不會",null,{g:"不會", dx:"否"}),
+           o("nodrive","我不開車","🚫",{dx:"不開車", ps:"我不開車。"}) ] },
+
+  /* ---------- 影像結節 ---------- */
+  { id:"nd_how", sec:"detail", grp:"nodule", lq:"L", type:"single", when:a=>cc(a,"nodule"),
+    q:"是做什麼檢查發現的？", short:"發現方式", dl:"檢查方式", ps:"是做{}發現的。",
+    opts:[ o("cxr","胸部 X 光","🩻",{dx:"胸部 X 光"}),
+           o("ldct","低劑量電腦斷層","🌀",{dx:"LDCT"}),
+           o("other","其他檢查或不清楚","❓",{dx:"其他／不清楚", ps:"我不清楚是做哪一種檢查發現的。"}) ] },
+  { id:"nd_when", sec:"detail", grp:"nodule", lq:"O", type:"single", when:a=>cc(a,"nodule"),
+    q:"大約什麼時候發現的？", short:"發現時間", dl:"發現時間", ps:"大約是{}發現的。",
+    opts:[ o("1m","1 個月內",null,{g:"<1月", dx:"1 個月內"}),
+           o("6m","1 到 6 個月前",null,{g:"1–6月", dx:"1–6 個月前"}),
+           o("old","半年以前",null,{g:">半年", dx:"半年以前"}),
+           o("fu","以前就在追蹤",null,{g:"追蹤中", dx:"既往追蹤中", ps:"以前就一直在追蹤。"}) ] },
+  { id:"nd_bring", sec:"detail", grp:"nodule", lq:"A", type:"multi", when:a=>cc(a,"nodule"),
+    q:"今天有沒有帶報告或影像光碟？", short:"攜帶資料", dl:"攜帶資料", ps:"今天{}。",
+    opts:[ o("report","有帶報告","📄",{dx:"報告"}), o("cd","有帶影像光碟","💿",{dx:"影像光碟"}),
+           NONE("都沒有帶","今天沒有帶報告或光碟。") ] },
+
+  /* ---------- 其他補充（永遠顯示，可略過） ---------- */
+  { id:"note", sec:"detail", type:"text", q:"還有什麼想告訴醫生的嗎？",
+    hint:"可以不填。按麥克風用說的，或直接打字。", short:"其他補充", dl:"病人補充", ps:"我還想說：{}" },
+
+  /* ---------- 病史 ---------- */
+  { id:"smoke", sec:"history", type:"single", q:"您有抽菸嗎？", short:"抽菸", dl:"吸菸", ps:"我{}。", row:true,
+    opts:[ o("never","從來沒有抽過","🚭",{dx:"從未吸菸"}),
+           o("former","以前有抽，已經戒了","✅",{dx:"已戒菸"}),
+           o("current","現在還有在抽","🚬",{dx:"目前吸菸"}) ] },
+  { id:"sm_amt", sec:"history", type:"single", when:a=>has(a,"smoke","former")||has(a,"smoke","current"),
+    q:"抽菸的時候，一天大約抽多少？", short:"一天幾包", dl:"每日量", ps:"一天大約抽{}。", row:true,
+    opts:[ o("half","半包以內（10 支以內）",null,{g:"½包", dx:"≤ 0.5 包/日", lo:.1, hi:.5}),
+           o("one","大約 1 包（11 到 20 支）",null,{g:"1包", dx:"約 1 包/日", lo:.55, hi:1}),
+           o("two","1 包到 2 包",null,{g:"1–2包", dx:"1–2 包/日", lo:1, hi:2}),
+           o("more","2 包以上",null,{g:"2包+", dx:"≥ 2 包/日", lo:2, hi:3}) ] },
+  { id:"sm_yrs", sec:"history", type:"single", when:a=>has(a,"smoke","former")||has(a,"smoke","current"),
+    q:"總共抽了幾年？", short:"抽了幾年", dl:"吸菸年數", ps:"總共抽了{}。",
+    opts:[ o("lt10","不到 10 年",null,{g:"<10", dx:"< 10 年", lo:1, hi:9}),
+           o("10","10 到 19 年",null,{g:"10+", dx:"10–19 年", lo:10, hi:19}),
+           o("20","20 到 29 年",null,{g:"20+", dx:"20–29 年", lo:20, hi:29}),
+           o("30","30 到 39 年",null,{g:"30+", dx:"30–39 年", lo:30, hi:39}),
+           o("40","40 年以上",null,{g:"40+", dx:"≥ 40 年", lo:40, hi:55}) ] },
+  { id:"sm_quit", sec:"history", type:"single", when:a=>has(a,"smoke","former"),
+    q:"戒菸多久了？", short:"戒菸多久", dl:"戒菸時間", ps:"已經戒菸{}了。",
+    opts:[ o("lt1","不到 1 年",null,{g:"<1年", dx:"< 1 年"}),
+           o("1to5","1 到 5 年",null,{g:"1–5年", dx:"1–5 年"}),
+           o("5to15","5 到 15 年",null,{g:"5–15年", dx:"5–15 年"}),
+           o("gt15","超過 15 年",null,{g:">15年", dx:"> 15 年"}) ] },
+  { id:"expo", sec:"history", type:"multi", q:"您有沒有接觸這些？", hint:"可以選很多個", short:"其他菸害", dl:"其他吸入暴露", ps:"我{}。",
+    opts:[ o("ecig","有用電子菸","💨",{dx:"電子菸"}),
+           o("htp","有用加熱菸","🔥",{dx:"加熱菸"}),
+           o("shs","常吸到二手菸","🚬",{dx:"二手菸"}),
+           o("incense","常燒香或燒金紙","🕯️",{dx:"燒香／金紙"}),
+           o("cook","常炒菜，接觸油煙","🍳",{dx:"烹飪油煙"}),
+           NONE("都沒有","我沒有接觸這些。") ] },
+  { id:"occ", sec:"history", type:"multi", q:"工作或生活環境，有沒有接觸這些？", hint:"可以選很多個", short:"環境職業", dl:"職業／環境暴露", ps:"工作或生活中會接觸{}。",
+    opts:[ o("dust","粉塵（工地、礦場、石材）","🏗️",{dx:"粉塵（營建／礦業／石材）"}),
+           o("asb","石綿（舊建材、造船）",null,{g:"石綿", dx:"石綿"}),
+           o("chem","化學物質、噴漆、溶劑","🧪",{dx:"化學物質／溶劑"}),
+           o("pest","農藥","🌾",{dx:"農藥"}),
+           o("bird","養鳥或養很多動物","🐦",{dx:"鳥類／動物"}),
+           o("mold","黴菌、很潮濕的環境","🍄",{dx:"黴菌／潮濕"}),
+           NONE("都沒有","工作和生活環境沒有特別的接觸。") ] },
+  { id:"contact", sec:"history", type:"multi", q:"最近一個月，有沒有這些情況？", hint:"可以選很多個", short:"旅遊接觸", dl:"旅遊／接觸史（1 個月）", ps:"最近一個月，{}。",
+    opts:[ o("travel","有出國","✈️",{dx:"近期出國"}),
+           o("tb","家人或同事得肺結核",null,{g:"TB", dx:"結核病接觸", flag:"amber"}),
+           o("sick","身邊有人咳嗽、感冒","🤧",{dx:"周遭呼吸道感染者"}),
+           o("inst","住院或住在安養機構","🏥",{dx:"住院／機構"}),
+           NONE("都沒有","最近一個月沒有出國，也沒有接觸生病的人。") ] },
+  { id:"pmh", sec:"history", type:"multi", q:"以前有沒有這些病？", hint:"可以選很多個", short:"過去病史", dl:"過去病史", ps:"我以前有{}。",
+    opts:[ o("asthma","氣喘","🌬️",{dx:"氣喘"}),
+           o("copd","肺阻塞（COPD）",null,{g:"COPD", dx:"COPD"}),
+           o("tb","肺結核（以前得過）",null,{g:"TB", dx:"結核病史"}),
+           o("heart","心臟病","🫀",{dx:"心臟病"}),
+           o("htn","高血壓","🩺",{dx:"高血壓"}),
+           o("dm","糖尿病","🍬",{dx:"糖尿病"}),
+           o("ar","過敏性鼻炎","🤧",{dx:"過敏性鼻炎"}),
+           o("gerd","胃食道逆流","🔥",{dx:"GERD"}),
+           o("ca","癌症","🎗️",{dx:"癌症病史"}),
+           NONE("都沒有","我以前沒有這些病。") ] },
+  { id:"meds", sec:"history", type:"multi", q:"目前有在用哪些藥？", hint:"可以選很多個", short:"目前用藥", dl:"目前用藥", ps:"我目前有在用{}。",
+    opts:[ o("inhaler","吸入劑（噴劑）","💨",{dx:"吸入劑"}),
+           o("bp","血壓藥","🩺",{dx:"降血壓藥"}),
+           o("anticoag","抗凝血劑或阿斯匹靈","💊",{dx:"抗凝血／抗血小板"}),
+           o("steroid","類固醇","💊",{dx:"類固醇"}),
+           o("bag","有帶藥袋，但不清楚是什麼藥","🛍️",{dx:"攜帶藥袋待核對", ps:"我有帶藥袋，但不清楚是什麼藥。"}),
+           NONE("都沒有","我目前沒有在用這些藥。") ] },
+  { id:"allergy", sec:"history", type:"single", q:"有沒有對藥物過敏？", short:"藥物過敏", dl:"藥物過敏", ps:"我{}。",
+    opts:[ o("yes","有，請跟醫師說是哪一種","⚠️",{dx:"有（待確認藥名）", flag:"amber", ps:"我有藥物過敏，等一下會跟醫師說是哪一種。"}),
+           o("no","沒有","⭕",{dx:"無", ps:"我沒有藥物過敏。"}),
+           o("unsure","不確定","❓",{dx:"不確定", ps:"我不確定有沒有藥物過敏。"}) ] },
+  { id:"fhx", sec:"history", type:"multi", q:"爸媽、兄弟姊妹或子女，有沒有人得過這些病？", hint:"可以選很多個", short:"家族史", dl:"家族史（一等親）", ps:"家人有人得過{}。",
+    opts:[ o("lungca","肺癌","🎗️",{dx:"肺癌"}),
+           o("asthma","氣喘或過敏","🌬️",{dx:"氣喘／過敏"}),
+           o("tb","肺結核",null,{g:"TB", dx:"結核病"}),
+           NONE("都沒有","家人沒有人得過這些病。") ] }
+];
+const qById = id => Q.find(q => q.id === id);
+const optOf = (q, v) => (q.opts || []).find(x => String(x.v) === String(v));
+
+/* ============================================================
+   2. 本機儲存 —— 絕不外傳。localStorage 不可用時退回記憶體。
+   ============================================================ */
+const store = (() => {
+  let mem = {}, ok = false;
+  try { localStorage.setItem("__t","1"); localStorage.removeItem("__t"); ok = true; } catch(e){}
+  const K = k => "wfchest:" + k;
+  return {
+    get(k, d){ try { const v = ok ? localStorage.getItem(K(k)) : mem[k]; return v == null ? d : JSON.parse(v); } catch(e){ return d; } },
+    set(k, v){ const s = JSON.stringify(v); try { if (ok) localStorage.setItem(K(k), s); else mem[k] = s; } catch(e){ mem[k] = s; } },
+    del(k){ try { if (ok) localStorage.removeItem(K(k)); } catch(e){} delete mem[k]; }
+  };
+})();
+
+let ans      = store.get("ans", {});
+let meta     = store.get("meta", {});          // started 時間、醫師勾選
+let settings = Object.assign({ step:"1", autoread:"on", lang:"zh", rate:"0.88", text:"on" }, store.get("settings", {}));
+let screen   = "home";   // home | q | review | doc
+let curId    = null;
+let returnToReview = false;
+const alerted = new Set();
+
+function save(){ store.set("ans", ans); store.set("meta", meta); }
+
+/* ============================================================
+   3. 語音輸出（與語圖相同的行動裝置處理）
+   ------------------------------------------------------------
+   · 語音合成必須在使用者手勢的同步流程裡呼叫，所以所有 speak 都
+     直接在點擊處理函式中執行，不經過 setTimeout 或 Promise。
+   · iOS 第一次觸控先送一個靜音 utterance 解鎖。
+   · 台語：瀏覽器沒有台語合成語音，只能播預錄檔
+       題目  assets/audio/nan/{題目id}.mp3
+       選項  assets/audio/nan/{題目id}__{選項值}.mp3
+     沒有錄音時退回華語合成。
+   ============================================================ */
+const hasTTS = "speechSynthesis" in window;
+const audioAvail = Object.create(null);
+let unlocked = false;
+
+function pickVoice(code){
+  if (!hasTTS) return null;
+  const vs = speechSynthesis.getVoices() || [];
+  const base = code.split("-")[0];
+  return vs.find(v => v.lang && v.lang.replace("_","-") === code)
+      || vs.find(v => v.lang && v.lang.replace("_","-") === "zh-TW")
+      || vs.find(v => v.lang && v.lang.replace("_","-").split("-")[0] === base) || null;
+}
+function unlock(){
+  if (unlocked) return; unlocked = true;
+  if (hasTTS){ const u = new SpeechSynthesisUtterance(" "); u.volume = 0; try { speechSynthesis.speak(u); } catch(e){} }
+}
+["pointerdown","touchstart","click"].forEach(ev => document.addEventListener(ev, unlock, { once:true, capture:true }));
+
+function probeNan(){
+  if (typeof fetch !== "function") return;
+  const ids = [];
+  Q.forEach(q => { ids.push(q.id); (q.opts || []).forEach(x => ids.push(q.id + "__" + x.v)); });
+  ["alert"].forEach(x => ids.push(x));
+  ids.forEach(id => {
+    if (audioAvail[id] !== undefined) return;
+    audioAvail[id] = false;
+    fetch(`assets/audio/nan/${id}.mp3`, { method:"HEAD" }).then(r => { audioAvail[id] = r.ok; }).catch(() => {});
+  });
+}
+
+let curAudio = null;
+function speak(text, audioId, queue){
+  unlock();
+  if (curAudio){ try { curAudio.pause(); } catch(e){} curAudio = null; }
+  if (settings.lang === "nan" && audioId && audioAvail[audioId]){
+    if (hasTTS) speechSynthesis.cancel();
+    curAudio = new Audio(`assets/audio/nan/${audioId}.mp3`);
+    curAudio.play().catch(() => tts(text, queue));
+    return;
+  }
+  tts(text, queue);
+}
+function tts(text, queue){
+  if (!hasTTS || !text) return;
+  try {
+    if (!queue) speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    const v = pickVoice("zh-TW"); if (v) u.voice = v;
+    u.lang = "zh-TW"; u.rate = Number(settings.rate) || 0.88;
+    speechSynthesis.speak(u);
+  } catch(e){}
+}
+let flashTimer = null;
+function flash(text){
+  const el = document.getElementById("said");
+  el.textContent = "🔊 " + text; el.hidden = false;
+  clearTimeout(flashTimer); flashTimer = setTimeout(() => { el.hidden = true; }, 2200);
+}
+const qSay = q => q.q + (q.hint ? "。" + q.hint : "");
+
+/* ============================================================
+   4. 流程
+   ============================================================ */
+function flow(){ return Q.filter(q => !q.when || q.when(ans)); }
+function isAnswered(q){
+  const v = ans[q.id];
+  if (v == null) return false;
+  if (Array.isArray(v)) return v.length > 0;
+  return String(v).trim() !== "";
+}
+/* 條件改變後，把已經不適用的答案清掉，避免摘要出現幽靈資料 */
+function prune(){
+  const live = new Set(flow().map(q => q.id));
+  Object.keys(ans).forEach(k => { if (!live.has(k)) delete ans[k]; });
+}
+
+function go(id, silent){
+  curId = id; screen = "q";
+  const q = qById(id);
+  if (!silent && settings.autoread === "on") speak(qSay(q), q.id);
+  render(); window.scrollTo(0,0);
+}
+function nextQ(){
+  prune(); save();
+  if (returnToReview){ returnToReview = false; toReview(); return; }
+  const f = flow(); const i = f.findIndex(q => q.id === curId);
+  if (i < f.length - 1) go(f[i+1].id); else toReview();
+}
+function prevQ(){
+  const f = flow(); const i = f.findIndex(q => q.id === curId);
+  if (returnToReview){ returnToReview = false; toReview(); return; }
+  if (i > 0) go(f[i-1].id); else { screen = "home"; render(); }
+}
+function toReview(){
+  screen = "review"; curId = null;
+  if (settings.autoread === "on") speak("填好了。請確認您的回答，也可以按「唸給醫生聽」。", "review");
+  render(); window.scrollTo(0,0);
+}
+
+/* ============================================================
+   5. 句子與摘要
+   ============================================================ */
+function labelsOf(q, key){
+  const v = ans[q.id]; if (v == null) return [];
+  if (q.type === "num" || q.type === "nrs" || q.type === "text") return [String(v)];
+  const arr = Array.isArray(v) ? v : [v];
+  return arr.map(x => optOf(q, x)).filter(Boolean).map(x => key === "dx" ? (x.dx || x.label) : x.label);
+}
+/* 病人版句子：一般選項套入樣板，有自己句子的選項另外接在後面 */
+function sentence(q){
+  if (!isAnswered(q)) return "";
+  if (q.type === "num" || q.type === "nrs" || q.type === "text") return q.ps.replace("{}", String(ans[q.id]).trim());
+  const arr = Array.isArray(ans[q.id]) ? ans[q.id] : [ans[q.id]];
+  const opts = arr.map(x => optOf(q, x)).filter(Boolean);
+  const plain = opts.filter(x => !x.ps).map(x => x.label.replace(/（.*?）/g, ""));
+  const own   = opts.filter(x => x.ps).map(x => x.ps);
+  const out = [];
+  if (plain.length) out.push(q.ps.replace("{}", plain.join(q.join || "、")));
+  return out.concat(own).join("");
+}
+function patientStory(){
+  return flow().map(sentence).filter(Boolean);
+}
+
+/* 紅旗與臨床提醒 —— 只做提醒，不做診斷 */
+function flagsFromOptions(){
+  const out = [];
+  flow().forEach(q => {
+    if (!isAnswered(q) || !q.opts) return;
+    const arr = Array.isArray(ans[q.id]) ? ans[q.id] : [ans[q.id]];
+    arr.forEach(v => { const x = optOf(q, v); if (x && x.flag) out.push({ lv:x.flag, text:`${q.dl}：${x.dx || x.label}`, grp:q.grp }); });
+  });
+  return out;
+}
+function packYears(){
+  const a = optOf(qById("sm_amt"), ans.sm_amt), y = optOf(qById("sm_yrs"), ans.sm_yrs);
+  if (!a || !y) return null;
+  return { lo: Math.round(a.lo * y.lo), hi: Math.round(a.hi * y.hi) };
+}
+function insights(){
+  const out = [], age = Number(ans.age) || null;
+  const coughW = has(ans,"cough_dur","2to3") || has(ans,"cough_dur","3to8") || has(ans,"cough_dur","gt8");
+  const resp = anyCC(ans, ["cough","sputum","hemo","cp","weight","fever"]);
+
+  /* 結核七分篩檢（疾管署）：咳嗽兩週 2、有痰 2、胸痛 1、沒有食慾 1、體重減輕 1；≥ 5 分建議就醫檢查 */
+  if (resp){
+    const items = [];
+    let s = 0;
+    if (coughW){ s += 2; items.push("咳嗽≥2週 2"); }
+    if (cc(ans,"sputum") || has(ans,"cough_type","wet")){ s += 2; items.push("有痰 2"); }
+    if (cc(ans,"cp")){ s += 1; items.push("胸痛 1"); }
+    if (has(ans,"sy_multi","anorexia")){ s += 1; items.push("食慾不振 1"); }
+    if (["1-3","3-5","gt5"].includes(ans.sy_wt) || cc(ans,"weight")){ s += 1; items.push("體重減輕 1"); }
+    out.push({ lv: s >= 5 ? "amber" : "info", text:`結核病七分篩檢：${s} / 7 分${s >= 5 ? "（≥ 5 分，建議胸部 X 光與驗痰）" : ""}`,
+               sub: items.length ? items.join("＋") : "無符合項目" });
+  }
+  if (has(ans,"contact","tb") || has(ans,"fhx","tb")) out.push({ lv:"amber", text:"結核病接觸史：家人或同事曾罹肺結核" });
+
+  /* 吸菸與 LDCT 公費篩檢資格（國健署，2025/1/1 起條件；條件若改版請更新此段）
+     家族史：一等親肺癌，男 45–74、女 40–74
+     重度吸菸：50–74 歲、≥ 20 包-年、仍吸菸或戒菸未滿 15 年
+     https://www.hpa.gov.tw/Pages/List.aspx?nodeid=4619 */
+  const py = packYears();
+  if (py){
+    const pyTxt = py.lo === py.hi ? `${py.lo}` : `${py.lo}–${py.hi}`;
+    out.push({ lv:"info", text:`吸菸量估計：約 ${pyTxt} 包-年`, sub:"由每日量與年數的區間推估，請當面確認" });
+  }
+  if (has(ans,"smoke","current")) out.push({ lv:"info", text:"目前吸菸：可轉介戒菸服務" });
+  if (age){
+    const famOK = has(ans,"fhx","lungca") && ((ans.sex === "m" && age >= 45 && age <= 74) || (ans.sex === "f" && age >= 40 && age <= 74));
+    let smkTxt = null;
+    if (py && age >= 50 && age <= 74 && (has(ans,"smoke","current") || (has(ans,"smoke","former") && ans.sm_quit && ans.sm_quit !== "gt15"))){
+      if (py.lo >= 20) smkTxt = "重度吸菸（≥ 20 包-年）";
+      else if (py.hi >= 20) smkTxt = "吸菸量接近 20 包-年門檻，需確認";
+    }
+    if (famOK || smkTxt){
+      out.push({ lv:"info", text:`可能符合國健署 LDCT 公費肺癌篩檢：${[famOK ? "一等親肺癌家族史" : null, smkTxt].filter(Boolean).join("、")}`,
+                 sub:"需再確認排除條件：12 個月內做過胸部 CT、曾罹肺癌、懷孕等" });
+    }
+  }
+
+  if (cc(ans,"cough") && has(ans,"meds","bp")) out.push({ lv:"info", text:"咳嗽＋服用降血壓藥：確認是否為 ACEI" });
+  if (has(ans,"cough_dur","gt8")) out.push({ lv:"info", text:"慢性咳嗽（> 8 週）" });
+  if ((cc(ans,"hemo") || has(ans,"sp_color","blood")) && has(ans,"meds","anticoag"))
+    out.push({ lv:"amber", text:"咳血＋使用抗凝血／抗血小板藥物" });
+  if (has(ans,"dy_pos","ortho") || has(ans,"dy_pos","pnd") || has(ans,"dy_assoc","edema"))
+    out.push({ lv:"info", text:"端坐呼吸／夜間陣發性呼吸困難／下肢水腫：需鑑別心因性呼吸困難" });
+  if (ans.dy_level != null) out.push({ lv: Number(ans.dy_level) >= 2 ? "amber" : "info", text:`呼吸困難 mMRC ${ans.dy_level}` });
+  const osa = ["snore","apnea","sleepy"].filter(v => has(ans,"sl_sym",v)).length;
+  if (osa >= 2) out.push({ lv:"info", text:"打鼾／呼吸中止／日間嗜睡：可評估 OSA（STOP-BANG）" });
+  if (has(ans,"sl_drive","often")) out.push({ lv:"amber", text:"開車或靜坐時常打瞌睡：注意行車安全" });
+  return out;
+}
+
+function nowStr(){
+  const d = new Date(), p = n => String(n).padStart(2,"0");
+  return `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function docText(){
+  const L = [];
+  L.push("【胸腔科門診預診摘要】" + nowStr());
+  const sex = ans.sex === "m" ? "男" : ans.sex === "f" ? "女" : "性別未填";
+  L.push(`病人：${ans.age ? ans.age + " 歲" : "年齡未填"} ${sex}｜${labelsOf(qById("visit"),"dx")[0] || "就診類型未填"}`);
+  const fl = flagsFromOptions().filter(x => x.lv === "red");
+  if (fl.length) L.push("⚠ 紅旗：" + fl.map(x => x.text).join("；"));
+  L.push("主訴 CC：" + (labelsOf(qById("cc"),"dx").join("、") || "未填"));
+  L.push("現病史 HPI：");
+  groupsInFlow().forEach(g => {
+    const parts = flow().filter(q => q.grp === g && isAnswered(q)).map(q => `${q.dl} ${labelsOf(q,"dx").join("、")}`);
+    L.push(`  [${GROUPS[g].name}] ${parts.join("；") || "未填"}`);
+  });
+  const ins = insights();
+  if (ins.length) L.push("臨床提醒：" + ins.map(x => x.text).join("；"));
+  ["smoke","sm_amt","sm_yrs","sm_quit","expo","occ","contact","pmh","meds","allergy","fhx"].forEach(id => {
+    const q = qById(id);
+    if (flow().includes(q)) L.push(`${q.dl}：${labelsOf(q,"dx").join("、") || "未填"}`);
+  });
+  if (isAnswered(qById("note"))) L.push("病人補充：" + ans.note.trim());
+  L.push("（本摘要由病人自行點選產生，內容未經醫師確認）");
+  return L.join("\n");
+}
+function groupsInFlow(){
+  const seen = [];
+  flow().forEach(q => { if (q.grp && !seen.includes(q.grp)) seen.push(q.grp); });
+  return seen;
+}
+
+/* ============================================================
+   6. 畫面
+   ============================================================ */
+const view = document.getElementById("view");
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+
+function render(){
+  document.getElementById("mPt").setAttribute("aria-pressed", screen !== "doc");
+  document.getElementById("mDoc").setAttribute("aria-pressed", screen === "doc");
+  document.getElementById("navbar").hidden = screen !== "q";
+  paintStepper();
+  if (screen === "home") renderHome();
+  else if (screen === "q") renderQ();
+  else if (screen === "review") renderReview();
+  else renderDoc();
+}
+
+function paintStepper(){
+  const el = document.getElementById("stepper");
+  if (screen === "home" || screen === "doc"){ el.hidden = true; return; }
+  el.hidden = false;
+  const f = flow();
+  const curSec = screen === "review" ? "review" : qById(curId).sec;
+  const ci = SECTIONS.findIndex(s => s.id === curSec);
+  el.innerHTML = SECTIONS.map((s, i) => {
+    let cls = i < ci ? "done" : i === ci ? "now" : "";
+    let p = "100%";
+    if (i === ci && screen === "q"){
+      const inSec = f.filter(q => q.sec === s.id);
+      const k = inSec.findIndex(q => q.id === curId);
+      p = Math.round(((k + 1) / inSec.length) * 100) + "%";
+    }
+    return `<div class="st ${cls}" style="--p:${p}"><i></i>${i+1} ${s.name}</div>`;
+  }).join("");
+}
+
+function renderHome(){
+  const started = Object.keys(ans).length > 0;
+  view.innerHTML = `
+    <section class="hero">
+      <h1>用點的，告訴醫生<br>您哪裡不舒服</h1>
+      <p>每一題都有圖示，點一下就會唸出來。填完後把手機或平板交給醫師看，看診會更快、更清楚。</p>
+      <div class="how">
+        <div><b>👆</b>點選症狀</div>
+        <div><b>🔊</b>聽語音說明</div>
+        <div><b>👨‍⚕️</b>交給醫師看</div>
+      </div>
+      <div class="homeactions">
+        ${started ? `<button class="bigbtn ok startbtn" id="hContinue">繼續填寫</button>
+                     <button class="bigbtn ghost block" id="hReview">看我填好的內容</button>
+                     <button class="bigbtn warn block" id="hNew">換下一位病人（清除重填）</button>`
+                  : `<button class="bigbtn ok startbtn" id="hStart">開始填寫</button>`}
+      </div>
+    </section>`;
+  const b = id => document.getElementById(id);
+  if (b("hStart")) b("hStart").onclick = () => { meta = { started:nowStr(), checks:{} }; save(); go(flow()[0].id); };
+  if (b("hContinue")) b("hContinue").onclick = () => {
+    const f = flow(); const first = f.find(q => !isAnswered(q) && q.type !== "text");
+    first ? go(first.id) : toReview();
+  };
+  if (b("hReview")) b("hReview").onclick = toReview;
+  if (b("hNew")) b("hNew").onclick = wipe;
+}
+
+function artHTML(x){
+  if (x.sw) return `<span class="sw" style="background:${x.sw}"></span>`;
+  if (x.g)  return `<span class="gly">${esc(x.g)}</span>`;
+  if (x.ic) return `<span class="emo" aria-hidden="true">${x.ic}</span>`;
+  return `<span class="gly">${esc(x.label.slice(0,2))}</span>`;
+}
+function renderQ(){
+  const q = qById(curId);
+  const f = flow(); const i = f.findIndex(x => x.id === curId);
+  document.getElementById("btnNext").textContent =
+    returnToReview ? "改好了，回到總覽" : (i === f.length - 1 ? "完成，看總覽" : (isAnswered(q) ? "下一題" : "跳過這題"));
+  document.getElementById("btnPrev").textContent = returnToReview ? "取消" : (i === 0 ? "回首頁" : "上一題");
+
+  let body = "";
+  if (q.type === "single" || q.type === "multi"){
+    const wide = q.row ? " wide" : "";
+    body = `<div class="grid${wide}">` + q.opts.map(x => {
+      const on = has(ans, q.id, x.v) || (Array.isArray(ans[q.id]) && ans[q.id].map(String).includes(String(x.v)));
+      return `<button class="tile${q.row ? " row" : ""}${on ? " on" : ""}${x.flag === "red" ? " red" : ""}" data-v="${esc(x.v)}" aria-pressed="${on}">
+        <span class="art">${artHTML(x)}</span><span class="label">${esc(x.label)}</span></button>`;
+    }).join("") + `</div>`;
+  } else if (q.type === "lvl"){
+    body = `<div class="lvls">` + q.opts.map(x => {
+      const on = String(ans[q.id]) === String(x.v);
+      const bars = [1,2,3,4,5].map(n => `<i class="${n <= x.v ? "f" : ""}"></i>`).join("");
+      return `<button class="lv${on ? " on" : ""}" data-v="${x.v}" aria-pressed="${on}"><span class="bar">${bars}</span>${esc(x.label)}</button>`;
+    }).join("") + `</div>`;
+  } else if (q.type === "nrs"){
+    const faces = { 0:"😀", 2:"🙂", 4:"😐", 6:"🙁", 8:"😣", 10:"😭" };
+    body = `<div class="nrs">` + Array.from({ length:11 }, (_, n) => {
+      const on = String(ans[q.id]) === String(n);
+      return `<button data-v="${n}" class="${on ? "on" : ""}" aria-pressed="${on}" aria-label="${n} 分"><span class="f">${faces[n] || ""}</span>${n}</button>`;
+    }).join("") + `</div><div class="nrsends"><span>0 不痛</span><span>10 痛到受不了</span></div>`;
+  } else if (q.type === "num"){
+    body = `<div class="numpad"><div class="numshow" id="numShow">${ans[q.id] ? esc(ans[q.id]) : "&nbsp;"}<small>${q.unit}</small></div>
+      <div class="keys">${[1,2,3,4,5,6,7,8,9].map(n => `<button data-k="${n}">${n}</button>`).join("")}
+      <button class="fn" data-k="c">清除</button><button data-k="0">0</button><button class="fn" data-k="b">⌫ 刪一個</button></div></div>`;
+  } else if (q.type === "body"){
+    body = bodyHTML(q);
+  } else if (q.type === "text"){
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    body = `<div class="note"><textarea id="noteTa" placeholder="例如：上個月開始咳，吃過感冒藥沒有好">${esc(ans[q.id] || "")}</textarea>
+      ${SR ? `<button class="mic" id="micBtn"><b>🎤</b><span>按一下開始說話</span></button>`
+           : `<p class="qhint">這台裝置的瀏覽器不支援語音輸入，請用鍵盤打字，或請家人、護理師協助。</p>`}</div>`;
+  }
+
+  view.innerHTML = `
+    <div class="qhead"><h1 class="qtext">${esc(q.q)}</h1>
+      <button class="listen" id="listenBtn" aria-label="唸題目"><b>🔊</b>聽題目</button></div>
+    ${q.hint ? `<p class="qhint${q.type === "multi" ? " multi" : ""}">${esc(q.hint)}</p>` : `<p class="qhint"></p>`}
+    ${body}`;
+
+  document.getElementById("listenBtn").onclick = () => speak(qSay(q), q.id);
+  bindQ(q);
+}
+
+function toggle(q, v){
+  let arr = Array.isArray(ans[q.id]) ? ans[q.id].slice() : [];
+  const x = optOf(q, v);
+  const sv = String(v);
+  if (arr.map(String).includes(sv)) arr = arr.filter(a => String(a) !== sv);
+  else if (x && x.none) arr = [x.v];
+  else { arr = arr.filter(a => !(optOf(q, a) || {}).none); arr.push(x.v); }
+  ans[q.id] = arr;
+  return arr.map(String).includes(sv);
+}
+function maybeAlert(x){
+  if (!x || !x.alert || alerted.has(x.dx)) return false;
+  alerted.add(x.dx);
+  const t = `您選了「${x.label}」。這個情況可能需要優先處理，請現在就告訴櫃台或護理師，不用等看診。`;
+  document.getElementById("alertText").textContent = t;
+  document.getElementById("alert").hidden = false;
+  speak("請馬上告訴護理師。" + t, "alert");
+  return true;
+}
+function bindQ(q){
+  const sayPick = x => { flash(x.label); if (!maybeAlert(x)) speak(x.label, q.id + "__" + x.v); };
+  if (q.type === "single" || q.type === "lvl"){
+    view.querySelectorAll("[data-v]").forEach(b => b.onclick = () => {
+      const x = optOf(q, b.dataset.v);
+      ans[q.id] = x.v; save(); sayPick(x); renderQ();
+    });
+  } else if (q.type === "multi" || q.type === "body"){
+    view.querySelectorAll("svg [data-v]").forEach(b => b.addEventListener("keydown", e => {
+      if (e.key === "Enter" || e.key === " "){ e.preventDefault(); b.dispatchEvent(new MouseEvent("click", { bubbles:true })); }
+    }));
+    view.querySelectorAll("[data-v]").forEach(b => b.onclick = () => {
+      const x = optOf(q, b.dataset.v);
+      const on = toggle(q, x.v); save();
+      if (on) sayPick(x); else speak("取消，" + x.label, null);
+      renderQ();
+    });
+  } else if (q.type === "nrs"){
+    view.querySelectorAll("[data-v]").forEach(b => b.onclick = () => {
+      ans[q.id] = Number(b.dataset.v); save(); flash(b.dataset.v + " 分"); speak(b.dataset.v + " 分", null); renderQ();
+    });
+  } else if (q.type === "num"){
+    view.querySelectorAll("[data-k]").forEach(b => b.onclick = () => {
+      let s = String(ans[q.id] || "");
+      const k = b.dataset.k;
+      if (k === "c") s = ""; else if (k === "b") s = s.slice(0, -1);
+      else if (s.length < 3 && !(s === "" && k === "0")) s += k;
+      if (Number(s) > 120) s = s.slice(0, -1);
+      ans[q.id] = s; save();
+      document.getElementById("numShow").innerHTML = (s || "&nbsp;") + `<small>${q.unit}</small>`;
+      if (k !== "c" && k !== "b") speak(k, null);
+      document.getElementById("btnNext").textContent = s ? "下一題" : "跳過這題";
+    });
+  } else if (q.type === "text"){
+    const ta = document.getElementById("noteTa");
+    ta.oninput = () => { ans[q.id] = ta.value; save(); };
+    bindMic(ta, q);
+  }
+}
+
+/* ---------- 語音輸入（Web Speech API；Chrome、Safari 支援） ---------- */
+let rec = null;
+function bindMic(ta, q){
+  const btn = document.getElementById("micBtn"); if (!btn) return;
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  btn.onclick = () => {
+    if (rec){ rec.stop(); return; }
+    if (hasTTS) speechSynthesis.cancel();
+    rec = new SR(); rec.lang = "zh-TW"; rec.interimResults = true; rec.continuous = true;
+    const base = ta.value ? ta.value.replace(/\s*$/, "") + (/[。，！？]$/.test(ta.value.trim()) ? "" : "。") : "";
+    let finals = "";
+    rec.onresult = e => {
+      let interim = "";
+      for (let i = e.resultIndex; i < e.results.length; i++){
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) finals += t; else interim += t;
+      }
+      ta.value = base + finals + interim; ans[q.id] = ta.value; save();
+    };
+    const stop = () => { rec = null; btn.classList.remove("rec"); btn.innerHTML = `<b>🎤</b><span>按一下開始說話</span>`; };
+    rec.onend = stop;
+    rec.onerror = ev => { stop(); if (ev.error === "not-allowed") alert("需要允許使用麥克風，才能用說的。"); };
+    try { rec.start(); btn.classList.add("rec"); btn.innerHTML = `<b>●</b><span>正在聽…說完再按一下</span>`; }
+    catch(e){ stop(); }
+  };
+}
+
+/* ---------- 身體圖：面對病人的正面視角，所以畫面左邊是病人的右胸 ---------- */
+const SHAPES = {
+  rchest:`<ellipse class="rg" data-v="rchest" cx="90" cy="150" rx="36" ry="36"/>`,
+  center:`<rect class="rg" data-v="center" x="133" y="110" width="34" height="96" rx="12"/>`,
+  lchest:`<ellipse class="rg" data-v="lchest" cx="210" cy="150" rx="36" ry="36"/>`,
+  rside: `<ellipse class="rg" data-v="rside" cx="74" cy="238" rx="26" ry="42"/>`,
+  epi:   `<ellipse class="rg" data-v="epi" cx="150" cy="240" rx="40" ry="28"/>`,
+  lside: `<ellipse class="rg" data-v="lside" cx="226" cy="238" rx="26" ry="42"/>`
+};
+const LABELPOS = { rchest:[90,155], center:[150,163], lchest:[210,155], rside:[74,243], epi:[150,245], lside:[226,243] };
+const SHORT = { rchest:"右胸", center:"中", lchest:"左胸", rside:"右肋", epi:"心窩", lside:"左肋" };
+function bodyHTML(q){
+  const sel = (ans[q.id] || []).map(String);
+  const shapes = q.opts.filter(x => x.shape).map(x => {
+    const on = sel.includes(x.v);
+    const [lx, ly] = LABELPOS[x.shape];
+    return SHAPES[x.shape].replace('class="rg"', `class="rg${on ? " on" : ""}" role="button" tabindex="0" aria-pressed="${on}" aria-label="${x.label}"`)
+      + `<text class="rl${on ? " on" : ""}" x="${lx}" y="${ly}">${SHORT[x.shape]}</text>`;
+  }).join("");
+  const others = q.opts.filter(x => !x.shape).map(x => {
+    const on = sel.includes(x.v);
+    return `<button class="tile row${on ? " on" : ""}" data-v="${x.v}" aria-pressed="${on}"><span class="art">${artHTML(x)}</span><span class="label">${esc(x.label)}</span></button>`;
+  }).join("");
+  return `<div class="bodywrap">
+    <div class="body"><svg viewBox="0 0 300 350" role="group" aria-label="胸部正面圖">
+      <circle class="skin" cx="150" cy="36" r="28"/>
+      <path class="skin" d="M132 60 L168 60 L170 84 Q246 88 262 122 L258 330 Q150 348 42 330 L38 122 Q54 88 130 84 Z"/>
+      <text class="side" x="22" y="112">右</text><text class="side" x="278" y="112">左</text>
+      ${shapes}
+    </svg><p class="bodynote">圖是面對您的樣子：畫面左邊是您的右邊</p></div>
+    <div class="grid wide">${others}</div></div>`;
+}
+
+/* ---------- 總覽（病人） ---------- */
+function renderReview(){
+  const f = flow();
+  const secs = SECTIONS.filter(s => s.id !== "review");
+  const lines = patientStory();
+  view.innerHTML = `
+    <h1 class="qtext" style="margin-bottom:12px">填好了，請確認</h1>
+    <div class="saybox">${lines.map(l => `<p>${esc(l)}</p>`).join("") || "<p>還沒有填任何內容。</p>"}</div>
+    <div class="homeactions">
+      <button class="bigbtn ok startbtn" id="rSay">🔊 唸給醫生聽</button>
+      <button class="bigbtn ghost block" id="rDoc">👨‍⚕️ 交給醫師看摘要</button>
+    </div>
+    ${secs.map(s => `<section class="revsec"><h2>${s.name}</h2>` + f.filter(q => q.sec === s.id).map(q => {
+        const txt = q.type === "num" ? (ans[q.id] ? ans[q.id] + " " + q.unit : "")
+                  : q.type === "nrs" ? (isAnswered(q) ? ans[q.id] + " 分" : "")
+                  : q.type === "text" ? (ans[q.id] || "").trim()
+                  : labelsOf(q).join("、");
+        return `<button class="revrow" data-q="${q.id}"><span class="k">${esc(q.short)}</span>
+          <span class="v${txt ? "" : " empty"}">${esc(txt || "沒有回答")}</span><span class="ed">修改</span></button>`;
+      }).join("") + `</section>`).join("")}
+    <div class="homeactions" style="margin-top:22px">
+      <button class="bigbtn warn block" id="rNew">看完診了，清除資料</button>
+    </div>`;
+  document.getElementById("rSay").onclick = () => {
+    unlock(); if (hasTTS) speechSynthesis.cancel();
+    lines.forEach((l, i) => tts(l, i > 0));
+  };
+  document.getElementById("rDoc").onclick = () => { if (hasTTS) speechSynthesis.cancel(); screen = "doc"; render(); window.scrollTo(0,0); };
+  document.getElementById("rNew").onclick = wipe;
+  view.querySelectorAll("[data-q]").forEach(b => b.onclick = () => { returnToReview = true; go(b.dataset.q); });
+}
+
+/* ---------- 醫師摘要 ---------- */
+function renderDoc(){
+  if (!Object.keys(ans).length){
+    view.innerHTML = `<div class="doc"><h1 class="qtext">醫師摘要</h1>
+      <p class="qhint">目前沒有病人填答。請病人在「病人」模式填完後再切換到這裡。</p></div>`;
+    return;
+  }
+  meta.checks = meta.checks || {};
+  const f = flow();
+  const sex = ans.sex === "m" ? "男" : ans.sex === "f" ? "女" : "—";
+  const redF = flagsFromOptions().filter(x => x.lv === "red");
+  const ambF = flagsFromOptions().filter(x => x.lv === "amber");
+  const ins = insights();
+  const LQ = { L:"位置", Q:"性質", N:"程度", O:"發作／病程", P:"誘發", E:"加重／緩解", R:"放射", A:"伴隨" };
+
+  const groupsHTML = groupsInFlow().map(g => {
+    const qs = f.filter(q => q.grp === g);
+    const dims = [...new Set(qs.map(q => q.lq))].map(d => {
+      const ok = qs.filter(q => q.lq === d).some(isAnswered);
+      return `<span class="dim ${ok ? "y" : "n"}" title="${LQ[d]}">${d} ${LQ[d]}${ok ? "" : " 待補問"}</span>`;
+    }).join("");
+    const rows = qs.map(q => {
+      if (!isAnswered(q)) return `<dt>${esc(q.dl)}</dt><dd class="miss">未回答，請補問</dd>`;
+      let v;
+      if (q.type === "nrs") v = esc(ans[q.id] + " / 10");
+      else {
+        const arr = Array.isArray(ans[q.id]) ? ans[q.id] : [ans[q.id]];
+        v = arr.map(x => optOf(q, x)).filter(Boolean).map(x => x.flag === "red" ? `<span class="r">${esc(x.dx || x.label)}</span>` : esc(x.dx || x.label)).join("、");
+      }
+      return `<dt>${esc(q.dl)}</dt><dd>${v}</dd>`;
+    }).join("");
+    const asks = GROUPS[g].ask.map((t, i) => {
+      const k = g + ":" + i;
+      return `<label><input type="checkbox" data-ck="${k}" ${meta.checks[k] ? "checked" : ""}>${esc(t)}</label>`;
+    }).join("");
+    return `<div class="grp"><header><b>${GROUPS[g].name}</b>${dims}</header>
+      <dl class="kv">${rows}</dl><div class="asks"><p>醫師補問清單</p>${asks}</div></div>`;
+  }).join("");
+
+  const hx = ["smoke","sm_amt","sm_yrs","sm_quit","expo","occ","contact","pmh","meds","allergy","fhx"]
+    .map(qById).filter(q => f.includes(q)).map(q =>
+      `<dt>${esc(q.dl)}</dt><dd class="${isAnswered(q) ? "" : "miss"}">${isAnswered(q) ? esc(labelsOf(q,"dx").join("、")) : "未回答"}</dd>`).join("");
+
+  view.innerHTML = `<div class="doc">
+    <h1 class="qtext">醫師摘要 <small style="font-size:14px;font-weight:500;color:var(--ink-soft)">開始填寫 ${esc(meta.started || "—")}</small></h1>
+    <div class="pt">${esc(ans.age || "—")} 歲　${sex}<span>${esc(labelsOf(qById("visit"),"dx")[0] || "就診類型未填")}</span></div>
+
+    ${redF.length ? `<h2>紅旗 <small>病人已被提醒告知護理人員</small></h2><div class="flags">${redF.map(x => `<div class="flag red">${esc(x.text)}</div>`).join("")}</div>` : ""}
+
+    <h2>主訴 CC</h2>
+    <div class="cc">${labelsOf(qById("cc"),"dx").map(t => `<span>${esc(t)}</span>`).join("") || "<span>未填</span>"}</div>
+
+    ${ins.length || ambF.length ? `<h2>臨床提醒 <small>僅供參考，不是診斷</small></h2><div class="flags">
+      ${ambF.map(x => `<div class="flag amber">${esc(x.text)}</div>`).join("")}
+      ${ins.map(x => `<div class="flag ${x.lv}">${esc(x.text)}${x.sub ? `<small>${esc(x.sub)}</small>` : ""}</div>`).join("")}</div>` : ""}
+
+    <h2>現病史 HPI <small>LQQOPERA 完整度：實心已問、虛線待補問</small></h2>
+    ${groupsHTML || `<p class="qhint">沒有需要展開的症狀。</p>`}
+
+    <h2>個人史與過去病史</h2>
+    <div class="grp"><dl class="kv">${hx}</dl></div>
+
+    ${isAnswered(qById("note")) ? `<h2>病人補充</h2><div class="saybox" style="font-size:18px">${esc(ans.note.trim())}</div>` : ""}
+
+    <div class="docactions">
+      <button class="bigbtn ok" id="dCopy">複製摘要文字（貼到病歷）</button>
+      <button class="bigbtn ghost" id="dPrint">列印</button>
+      <button class="bigbtn ghost" id="dBack">回到病人畫面</button>
+    </div>
+    <p class="disclaim">本摘要由病人自行點選產生，內容未經醫師確認。臨床提醒依公開篩檢準則的條件比對，僅供問診參考。</p>
+  </div>`;
+
+  view.querySelectorAll("[data-ck]").forEach(c => c.onchange = () => { meta.checks[c.dataset.ck] = c.checked; save(); });
+  document.getElementById("dCopy").onclick = async () => {
+    const t = docText();
+    try { await navigator.clipboard.writeText(t); flash("已複製摘要文字"); }
+    catch(e){
+      const ta = document.createElement("textarea"); ta.value = t; document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); flash("已複製摘要文字"); } catch(_){ alert(t); }
+      ta.remove();
+    }
+  };
+  document.getElementById("dPrint").onclick = () => window.print();
+  document.getElementById("dBack").onclick = () => { screen = Object.keys(ans).length ? "review" : "home"; render(); };
+}
+
+function wipe(){
+  if (!confirm("確定要清除這位病人的所有填答嗎？清除後無法復原。")) return;
+  ans = {}; meta = {}; alerted.clear(); store.del("ans"); store.del("meta");
+  if (hasTTS) speechSynthesis.cancel();
+  screen = "home"; returnToReview = false; render(); window.scrollTo(0,0);
+}
+
+/* ============================================================
+   7. 事件
+   ============================================================ */
+document.getElementById("btnNext").onclick = nextQ;
+document.getElementById("btnPrev").onclick = prevQ;
+document.getElementById("alertOk").onclick = () => { document.getElementById("alert").hidden = true; if (hasTTS) speechSynthesis.cancel(); };
+document.getElementById("mPt").onclick = () => {
+  if (screen !== "doc") return;
+  screen = Object.keys(ans).length ? "review" : "home"; render();
+};
+document.getElementById("mDoc").onclick = () => { if (hasTTS) speechSynthesis.cancel(); screen = "doc"; render(); window.scrollTo(0,0); };
+
+/* ---------- 設定 ---------- */
+const dlg = document.getElementById("dlg");
+function applySettings(){
+  document.documentElement.style.setProperty("--step", settings.step);
+  document.body.dataset.text = settings.text;
+  document.querySelectorAll(".seg[data-set]").forEach(seg => {
+    const k = seg.dataset.set;
+    seg.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === String(settings[k]))));
+  });
+  document.getElementById("langNote").textContent = settings.lang === "nan"
+    ? "手機和平板沒有內建台語語音，只能播放預先錄好的音檔（assets/audio/nan/）。沒有錄音的題目會改用華語唸。"
+    : "";
+  store.set("settings", settings);
+}
+document.querySelectorAll(".seg[data-set]").forEach(seg => seg.addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  settings[seg.dataset.set] = b.dataset.v;
+  if (seg.dataset.set === "lang" && b.dataset.v === "nan") probeNan();
+  applySettings(); if (screen !== "doc") render();
+}));
+document.getElementById("btnSet").onclick = () => {
+  const n = hasTTS ? (speechSynthesis.getVoices() || []).filter(v => /zh/i.test(v.lang)).length : 0;
+  document.getElementById("voiceInfo").textContent = !hasTTS ? "這個瀏覽器不支援語音朗讀。"
+    : n ? `這台裝置有 ${n} 個中文語音。` : "尚未偵測到中文語音；若按測試沒有聲音，請到系統設定下載中文語音。";
+  dlg.showModal();
+};
+document.getElementById("btnClose").onclick = () => dlg.close();
+document.getElementById("btnTest").onclick = () => speak("您好，這是胸腔科問診的語音測試。", null);
+document.getElementById("btnWipe").onclick = () => { dlg.close(); wipe(); };
+
+applySettings();
+if (settings.lang === "nan") probeNan();
+render();
+
+if ("serviceWorker" in navigator && location.protocol === "https:"){
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+</script>
+</body>
+</html>
