@@ -284,6 +284,11 @@ footer{ padding:16px 14px 110px; text-align:center; color:var(--ink-soft); font-
 .about{ background:var(--surface); border-radius:10px; padding:12px 14px; font-size:calc(13.5px * var(--step)); line-height:1.65; }
 .about b{ display:block; font-size:calc(15px * var(--step)); margin-bottom:4px; }
 .seg.wrap button{ flex:1 1 30%; }
+.sumhead{ display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:8px 16px; margin:22px 0 8px; }
+.sumhead h2{ margin:0; }
+.sumlang{ flex:0 0 auto; }
+.sumlang button{ min-height:42px; padding:8px 18px; flex:0 0 auto; }
+@media print{ .sumlang{ display:none; } }
 .docsum{ display:block; width:100%; min-height:220px; resize:vertical; overflow:hidden;
   border:2px solid var(--line); border-radius:12px; background:#FAFCFC; padding:14px 16px;
   font:inherit; font-size:calc(15.5px * var(--step)); line-height:1.7; color:var(--ink); white-space:pre-wrap; }
@@ -408,7 +413,7 @@ footer{ padding:16px 14px 110px; text-align:center; color:var(--ink-soft); font-
    版本與預期用途（院內規範用；改版時一併更新）
    ============================================================ */
 const APP = {
-  version:"v2.3",
+  version:"v2.4",
   date:"2026-09-11",
   url:"https://maguro631023.github.io/wanfang-chest/",
   purpose:"協助門診病人於看診前，以點選、圖示與語音整理症狀與病史，產出供醫師參考的摘要。不做診斷，不提供治療建議，不取代醫師問診。",
@@ -849,7 +854,7 @@ const store = (() => {
 
 let ans      = store.get("ans", {});
 let meta     = store.get("meta", {});
-let settings = Object.assign({ step:"1", autoread:"on", lang:"zh", rate:"0.88", text:"on", voices:{} }, store.get("settings", {}));
+let settings = Object.assign({ step:"1", autoread:"on", lang:"zh", rate:"0.88", text:"on", voices:{}, docLang:"zh" }, store.get("settings", {}));
 settings.voices = settings.voices || {};
 let screen   = "home";   // home | notice | q | review | doc
 let curId    = null;
@@ -1131,11 +1136,95 @@ function answerZh(q){
   return labelsOf(q).join("、");
 }
 
+/* ============================================================
+   病歷摘要英文版用詞（醫師端，臨床英文縮寫風格）
+   鍵：題目 id → 欄位名；題目 id__選項值 → 醫學用詞
+   ============================================================ */
+const DL_EN = {
+  age:"Age", sex:"Sex", visit:"Visit", cc:"CC",
+  cough_dur:"Duration", cough_type:"Character", cough_time:"Timing", cough_trig:"Triggers", cough_assoc:"Assoc.", cough_sev:"Severity",
+  sp_color:"Color", sp_thick:"Consistency", sp_amt:"Amount", sp_time:"Timing",
+  hm_form:"Appearance", hm_src:"Source", hm_freq:"Frequency", hm_last:"Last episode",
+  dy_onset:"Onset", dy_level:"Exertional tolerance", dy_pos:"Positional/nocturnal", dy_relief:"Relieved by", dy_assoc:"Assoc.",
+  cp_loc:"Location", cp_quality:"Quality", cp_resp:"Aggravated by", cp_rad:"Radiation", cp_dur:"Episode duration", cp_danger:"Assoc./red-flag sx", cp_nrs:"Pain NRS",
+  sy_fever:"Fever", sy_multi:"Constitutional sx", sy_wt:"Unintentional wt loss",
+  sl_sym:"Sleep sx", sl_drive:"Drowsiness (driving/sitting)",
+  nd_how:"Detected by", nd_when:"Detected", nd_bring:"Brought",
+  note:"Patient's note",
+  smoke:"Smoking", sm_amt:"Amount", sm_yrs:"Years smoked", sm_quit:"Quit", expo:"Other inhalational exposure",
+  occ:"Occupational/environmental exposure", contact:"Travel/contacts (past 1 mo)", pmh:"PMH", meds:"Current meds",
+  allergy:"Drug allergy", fhx:"FHx (1st-degree)"
+};
+const GROUP_EN = { cough:"Cough", sputum:"Sputum", hemo:"Hemoptysis", dysp:"Dyspnea", cp:"Chest pain", sys:"Constitutional", sleep:"Sleep", nodule:"Imaging finding" };
+const DX_EN = {
+  sex:{ m:"M", f:"F" },
+  visit:{ new:"New problem", fu:"Follow-up", report:"Brings health-check/outside report" },
+  cc:{ cough:"Cough", sputum:"Sputum", hemo:"Hemoptysis", dysp:"Dyspnea", cp:"Chest pain/tightness", fever:"Fever",
+       weight:"Weight loss/fatigue", sleep:"Snoring/sleep problem", nodule:"Lung nodule on imaging", other:"Other" },
+  cough_dur:{ lt2:"<2 wk", "2to3":"2–3 wk", "3to8":"3–8 wk (subacute)", gt8:">8 wk (chronic)" },
+  cough_type:{ dry:"Dry", wet:"Productive" },
+  cough_time:{ day:"Daytime", night:"Nocturnal", lying:"Supine", morning:"Early morning", all:"All day" },
+  cough_trig:{ cold:"Cold air", ice:"Cold food/drinks", exer:"Post-exercise", talk:"Talking/laughing",
+               smell:"Irritants (smoke/fumes/perfume)", season:"Seasonal change", none:"None" },
+  cough_assoc:{ wheeze:"Wheezing", pnd:"Postnasal drip (?UACS)", gerd:"Reflux sx", itch:"Throat itch", hoarse:"Hoarseness", none:"None" },
+  cough_sev:{ 1:"1/5", 2:"2/5", 3:"3/5", 4:"4/5", 5:"5/5 (disturbs sleep/work)" },
+  sp_color:{ white:"White/clear", yellow:"Yellow", green:"Green", rust:"Rusty/brown", blood:"Blood-tinged" },
+  sp_thick:{ thin:"Thin/watery", thick:"Thick/tenacious" },
+  sp_amt:{ s:"Scant (<1 tbsp/day)", m:"Moderate (several tbsp/day)", l:"Copious (>½ cup/day)" },
+  sp_time:{ morning:"Worst on waking", lying:"Worse supine", same:"Constant" },
+  hm_form:{ streak:"Blood-streaked sputum", frank:"Frank hemoptysis (mouthful)", clot:"Clots" },
+  hm_src:{ cough:"Coughed up (true hemoptysis)", nose:"From nose (?epistaxis/PND)", vomit:"Vomited (?hematemesis)", unsure:"Uncertain" },
+  hm_freq:{ once:"Single episode", some:"Intermittent", every:"With every cough" },
+  hm_last:{ today:"Today", days:"Past few days", week:">1 wk ago" },
+  dy_onset:{ sudden:"Acute (minutes–hours)", days:"Over days", slow:"Gradual (weeks–months)" },
+  dy_level:{ 0:"mMRC 0", 1:"mMRC 1", 2:"mMRC 2", 3:"mMRC 3", 4:"mMRC 4" },
+  dy_pos:{ ortho:"Orthopnea", pnd:"PND", none:"None" },
+  dy_relief:{ rest:"Rest", sit:"Sitting up", inhaler:"Inhaler", no:"No relief" },
+  dy_assoc:{ wheeze:"Wheezing", edema:"Leg edema", cyan:"Cyanosis", palp:"Palpitations", none:"None" },
+  cp_loc:{ rchest:"R anterior chest", center:"Retrosternal", lchest:"L anterior chest", rside:"R lateral chest wall",
+           epi:"Epigastric", lside:"L lateral chest wall", back:"Back", diffuse:"Diffuse, poorly localized" },
+  cp_quality:{ press:"Pressure/tightness", stab:"Stabbing", tear:"Tearing", burn:"Burning", pleur:"Pleuritic" },
+  cp_resp:{ breath:"Deep inspiration", cough:"Coughing", move:"Movement/palpation (?MSK)", exert:"Exertion", none:"None" },
+  cp_rad:{ neck:"Neck", jaw:"Jaw", larm:"L shoulder/arm", back:"Back", none:"None" },
+  cp_dur:{ sec:"Seconds", min:"Minutes", long:">20 min", const:"Constant" },
+  cp_danger:{ sweat:"Diaphoresis", pale:"Pallor", faint:"Presyncope/dizziness", sob:"Dyspnea", palp:"Palpitations", none:"None" },
+  sy_fever:{ measured:"Measured ≥38 °C", feel:"Subjective (not measured)", no:"Afebrile" },
+  sy_multi:{ chill:"Chills", sweat:"Night sweats", anorexia:"Anorexia", fatigue:"Fatigue", none:"None" },
+  sy_wt:{ "0":"None", "1-3":"~1–3 kg", "3-5":"~3–5 kg", gt5:">5 kg", unk:"Unknown" },
+  sl_sym:{ snore:"Loud snoring", apnea:"Witnessed apnea", sleepy:"Daytime sleepiness", headache:"Morning headache", unrest:"Unrefreshing sleep" },
+  sl_drive:{ often:"Often", some:"Sometimes", never:"No", nodrive:"Does not drive" },
+  nd_how:{ cxr:"CXR", ldct:"LDCT", other:"Other/unknown" },
+  nd_when:{ "1m":"<1 mo ago", "6m":"1–6 mo ago", old:">6 mo ago", fu:"Under follow-up" },
+  nd_bring:{ report:"Report", cd:"Image CD", none:"None" },
+  smoke:{ never:"Never", former:"Former", current:"Current" },
+  sm_amt:{ half:"≤0.5 ppd", one:"~1 ppd", two:"1–2 ppd", more:"≥2 ppd" },
+  sm_yrs:{ lt10:"<10 y", "10":"10–19 y", "20":"20–29 y", "30":"30–39 y", "40":"≥40 y" },
+  sm_quit:{ lt1:"<1 y ago", "1to5":"1–5 y ago", "5to15":"5–15 y ago", gt15:">15 y ago" },
+  expo:{ ecig:"E-cigarettes", htp:"Heated tobacco", shs:"Secondhand smoke", incense:"Incense/joss paper burning", cook:"Cooking fumes", none:"None" },
+  occ:{ dust:"Dust (construction/mining/stone)", asb:"Asbestos", chem:"Chemicals/solvents", pest:"Pesticides", bird:"Birds/animals", mold:"Mold/damp", none:"None" },
+  contact:{ travel:"Recent travel abroad", tb:"TB contact", sick:"Sick contacts", inst:"Hospitalization/institution", none:"None" },
+  pmh:{ asthma:"Asthma", copd:"COPD", tb:"Prior TB", heart:"Heart disease", htn:"HTN", dm:"DM", ar:"Allergic rhinitis", gerd:"GERD", ca:"Cancer", none:"None" },
+  meds:{ inhaler:"Inhaler", bp:"Antihypertensive", anticoag:"Anticoagulant/antiplatelet", steroid:"Steroid", bag:"Brought meds (to verify)", none:"None" },
+  allergy:{ yes:"Yes (drug to be confirmed)", no:"NKDA", unsure:"Unsure" },
+  fhx:{ lungca:"Lung cancer", asthma:"Asthma/atopy", tb:"TB", none:"None" }
+};
+const LANG_EN = { zh:"Mandarin", nan:"Taiwanese", hak:"Hakka", en:"English", id:"Indonesian", vi:"Vietnamese", ja:"Japanese" };
+const dxEn = (q, x) => (DX_EN[q.id] && DX_EN[q.id][x.v] != null) ? DX_EN[q.id][x.v] : (x.dx || x.label);
+function dxList(q, lang){
+  if (!isAnswered(q)) return [];
+  if (q.type === "nrs") return [ans[q.id] + "/10"];
+  if (q.type === "num" || q.type === "text") return [String(ans[q.id]).trim()];
+  return valList(q).map(v => optOf(q, v)).filter(Boolean).map(x => lang === "en" ? dxEn(q, x) : (x.dx || x.label));
+}
+
 function flagsFromOptions(){
   const out = [];
   flow().forEach(q => {
     if (!isAnswered(q) || !q.opts) return;
-    valList(q).forEach(v => { const x = optOf(q, v); if (x && x.flag) out.push({ lv:x.flag, text:`${q.dl}：${x.dx || x.label}`, grp:q.grp }); });
+    valList(q).forEach(v => {
+      const x = optOf(q, v);
+      if (x && x.flag) out.push({ lv:x.flag, text:`${q.dl}：${x.dx || x.label}`, en:`${DL_EN[q.id] || q.id}: ${dxEn(q, x)}`, grp:q.grp });
+    });
   });
   return out;
 }
@@ -1144,23 +1233,27 @@ function packYears(){
   if (!a || !y) return null;
   return { lo: Math.round(a.lo * y.lo), hi: Math.round(a.hi * y.hi) };
 }
+/* 臨床提醒：每一條同時帶華語（text/sub）與英文（en/subEn） */
 function insights(){
   const out = [], age = Number(ans.age) || null;
+  const add = (lv, text, en, sub, subEn) => out.push({ lv, text, en, sub, subEn });
   const coughW = ["2to3","3to8","gt8"].includes(ans.cough_dur);
   const resp = anyCC(ans, ["cough","sputum","hemo","cp","weight","fever"]);
 
   /* 結核病七分篩檢（疾管署）：咳嗽兩週 2、有痰 2、胸痛 1、沒有食慾 1、體重減輕 1；≥ 5 分建議就醫檢查 */
   if (resp){
-    const items = []; let s = 0;
-    if (coughW){ s += 2; items.push("咳嗽≥2週 2"); }
-    if (cc(ans,"sputum") || has(ans,"cough_type","wet")){ s += 2; items.push("有痰 2"); }
-    if (cc(ans,"cp")){ s += 1; items.push("胸痛 1"); }
-    if (has(ans,"sy_multi","anorexia")){ s += 1; items.push("食慾不振 1"); }
-    if (["1-3","3-5","gt5"].includes(ans.sy_wt) || cc(ans,"weight")){ s += 1; items.push("體重減輕 1"); }
-    out.push({ lv: s >= 5 ? "amber" : "info", text:`結核病七分篩檢：${s} / 7 分${s >= 5 ? "（≥ 5 分，建議胸部 X 光與驗痰）" : ""}`,
-               sub: items.length ? items.join("＋") : "無符合項目" });
+    const zh = [], en = []; let s = 0;
+    if (coughW){ s += 2; zh.push("咳嗽≥2週 2"); en.push("cough ≥2 wk 2"); }
+    if (cc(ans,"sputum") || has(ans,"cough_type","wet")){ s += 2; zh.push("有痰 2"); en.push("sputum 2"); }
+    if (cc(ans,"cp")){ s += 1; zh.push("胸痛 1"); en.push("chest pain 1"); }
+    if (has(ans,"sy_multi","anorexia")){ s += 1; zh.push("食慾不振 1"); en.push("anorexia 1"); }
+    if (["1-3","3-5","gt5"].includes(ans.sy_wt) || cc(ans,"weight")){ s += 1; zh.push("體重減輕 1"); en.push("weight loss 1"); }
+    add(s >= 5 ? "amber" : "info",
+      `結核病七分篩檢：${s} / 7 分${s >= 5 ? "（≥ 5 分，建議胸部 X 光與驗痰）" : ""}`,
+      `Taiwan CDC 7-point TB screen: ${s}/7${s >= 5 ? " (≥5: consider CXR and sputum AFB)" : ""}`,
+      zh.length ? zh.join("＋") : "無符合項目", en.length ? en.join(" + ") : "no items");
   }
-  if (has(ans,"contact","tb") || has(ans,"fhx","tb")) out.push({ lv:"amber", text:"結核病接觸史：家人或同事曾罹肺結核" });
+  if (has(ans,"contact","tb") || has(ans,"fhx","tb")) add("amber", "結核病接觸史：家人或同事曾罹肺結核", "TB exposure: family member or coworker with TB");
 
   /* 吸菸與 LDCT 公費篩檢資格（國健署，2025/1/1 起條件；條件若改版請更新此段）
      家族史：一等親肺癌，男 45–74、女 40–74
@@ -1169,34 +1262,38 @@ function insights(){
   const py = packYears();
   if (py){
     const pyTxt = py.lo === py.hi ? `${py.lo}` : `${py.lo}–${py.hi}`;
-    out.push({ lv:"info", text:`吸菸量估計：約 ${pyTxt} 包-年`, sub:"由每日量與年數的區間推估，請當面確認" });
+    add("info", `吸菸量估計：約 ${pyTxt} 包-年`, `Est. ${pyTxt} pack-years`,
+        "由每日量與年數的區間推估，請當面確認", "estimated from answer ranges; please confirm");
   }
-  if (has(ans,"smoke","current")) out.push({ lv:"info", text:"目前吸菸：可轉介戒菸服務" });
+  if (has(ans,"smoke","current")) add("info", "目前吸菸：可轉介戒菸服務", "Current smoker: offer cessation referral");
   if (age){
     const famOK = has(ans,"fhx","lungca") && ((ans.sex === "m" && age >= 45 && age <= 74) || (ans.sex === "f" && age >= 40 && age <= 74));
-    let smkTxt = null;
+    let smkZh = null, smkEn = null;
     if (py && age >= 50 && age <= 74 && (has(ans,"smoke","current") || (has(ans,"smoke","former") && ans.sm_quit && ans.sm_quit !== "gt15"))){
-      if (py.lo >= 20) smkTxt = "重度吸菸（≥ 20 包-年）";
-      else if (py.hi >= 20) smkTxt = "吸菸量接近 20 包-年門檻，需確認";
+      if (py.lo >= 20){ smkZh = "重度吸菸（≥ 20 包-年）"; smkEn = "heavy smoking (≥20 pack-years)"; }
+      else if (py.hi >= 20){ smkZh = "吸菸量接近 20 包-年門檻，需確認"; smkEn = "pack-years near 20 threshold, confirm"; }
     }
-    if (famOK || smkTxt){
-      out.push({ lv:"info", text:`可能符合國健署 LDCT 公費肺癌篩檢：${[famOK ? "一等親肺癌家族史" : null, smkTxt].filter(Boolean).join("、")}`,
-                 sub:"需再確認排除條件：12 個月內做過胸部 CT、曾罹肺癌、懷孕等" });
+    if (famOK || smkZh){
+      add("info",
+        `可能符合國健署 LDCT 公費肺癌篩檢：${[famOK ? "一等親肺癌家族史" : null, smkZh].filter(Boolean).join("、")}`,
+        `May qualify for HPA-funded LDCT lung cancer screening: ${[famOK ? "1st-degree FHx of lung cancer" : null, smkEn].filter(Boolean).join(", ")}`,
+        "需再確認排除條件：12 個月內做過胸部 CT、曾罹肺癌、懷孕等", "check exclusions: chest CT within 12 mo, prior lung cancer, pregnancy");
     }
   }
-  if (cc(ans,"cough") && has(ans,"meds","bp")) out.push({ lv:"info", text:"咳嗽＋服用降血壓藥：確認是否為 ACEI" });
-  if (has(ans,"cough_dur","gt8")) out.push({ lv:"info", text:"慢性咳嗽（> 8 週）" });
+  if (cc(ans,"cough") && has(ans,"meds","bp")) add("info", "咳嗽＋服用降血壓藥：確認是否為 ACEI", "Cough + antihypertensive: check for ACEI");
+  if (has(ans,"cough_dur","gt8")) add("info", "慢性咳嗽（> 8 週）", "Chronic cough (>8 wk)");
   if ((cc(ans,"hemo") || has(ans,"sp_color","blood")) && has(ans,"meds","anticoag"))
-    out.push({ lv:"amber", text:"咳血＋使用抗凝血／抗血小板藥物" });
+    add("amber", "咳血＋使用抗凝血／抗血小板藥物", "Hemoptysis on anticoagulant/antiplatelet");
   if (has(ans,"dy_pos","ortho") || has(ans,"dy_pos","pnd") || has(ans,"dy_assoc","edema"))
-    out.push({ lv:"info", text:"端坐呼吸／夜間陣發性呼吸困難／下肢水腫：需鑑別心因性呼吸困難" });
-  if (ans.dy_level != null) out.push({ lv: Number(ans.dy_level) >= 2 ? "amber" : "info", text:`呼吸困難 mMRC ${ans.dy_level}` });
+    add("info", "端坐呼吸／夜間陣發性呼吸困難／下肢水腫：需鑑別心因性呼吸困難", "Orthopnea/PND/leg edema: consider cardiac cause of dyspnea");
+  if (ans.dy_level != null) add(Number(ans.dy_level) >= 2 ? "amber" : "info", `呼吸困難 mMRC ${ans.dy_level}`, `Dyspnea mMRC ${ans.dy_level}`);
   const osa = ["snore","apnea","sleepy"].filter(v => has(ans,"sl_sym",v)).length;
-  if (osa >= 2) out.push({ lv:"info", text:"打鼾／呼吸中止／日間嗜睡：可評估 OSA（STOP-BANG）" });
-  if (has(ans,"sl_drive","often")) out.push({ lv:"amber", text:"開車或靜坐時常打瞌睡：注意行車安全" });
+  if (osa >= 2) add("info", "打鼾／呼吸中止／日間嗜睡：可評估 OSA（STOP-BANG）", "Snoring/witnessed apnea/daytime sleepiness: consider OSA work-up (STOP-BANG)");
+  if (has(ans,"sl_drive","often")) add("amber", "開車或靜坐時常打瞌睡：注意行車安全", "Frequent drowsiness when driving/sitting: driving safety");
   const pl = langOf(ans._lang || "zh");
-  if (pl.foreign) out.push({ lv:"info", text:`病人以${pl.zhName}填寫：選項已轉為華語，但可能需要翻譯協助當面確認` });
-  if (pl.foreign && isAnswered(qById("note"))) out.push({ lv:"amber", text:`「病人補充」是以${pl.zhName}輸入，可能需要翻譯` });
+  if (pl.foreign) add("info", `病人以${pl.zhName}填寫：選項已轉為華語，但可能需要翻譯協助當面確認`,
+                      `Completed in ${LANG_EN[pl.id]}: answers mapped to standard terms; interpreter may be needed`);
+  if (pl.foreign && isAnswered(qById("note"))) add("amber", `「病人補充」是以${pl.zhName}輸入，可能需要翻譯`, `Patient's note entered in ${LANG_EN[pl.id]}; may need translation`);
   return out;
 }
 
@@ -1209,28 +1306,42 @@ function groupsInFlow(){
   flow().forEach(q => { if (q.grp && !seen.includes(q.grp)) seen.push(q.grp); });
   return seen;
 }
-function docText(){
-  const Ls = [];
-  Ls.push("【胸腔科門診預診摘要】" + nowStr());
-  const sex = ans.sex === "m" ? "男" : ans.sex === "f" ? "女" : "性別未填";
-  const pl = langOf(ans._lang || "zh");
-  Ls.push(`病人：${ans.age ? ans.age + " 歲" : "年齡未填"} ${sex}｜${labelsOf(qById("visit"),"dx")[0] || "就診類型未填"}${pl.id !== "zh" ? "｜填寫語言：" + pl.zhName : ""}`);
+const HX_IDS = ["smoke","sm_amt","sm_yrs","sm_quit","expo","occ","contact","pmh","meds","allergy","fhx"];
+
+/* 病歷摘要純文字：lang = "zh" 華語、"en" 英文 */
+function docText(lang){
+  const en = lang === "en";
+  const J = en ? ", " : "、", S = en ? "; " : "；", C = en ? ": " : "：";
+  const Ls = [], pl = langOf(ans._lang || "zh");
+  const lbl = q => en ? (DL_EN[q.id] || q.dl) : q.dl;
+  const vals = q => dxList(q, lang).join(J);
+  if (en){
+    Ls.push("[Pulmonary Clinic Pre-visit Summary] " + nowStr());
+    const sex = ans.sex === "m" ? "M" : ans.sex === "f" ? "F" : "sex N/A";
+    const visit = isAnswered(qById("visit")) ? vals(qById("visit")) : "visit type N/A";
+    Ls.push(`Pt: ${ans.age ? ans.age + " y/o" : "age N/A"} ${sex} | ${visit}${pl.id !== "zh" ? " | Language: " + LANG_EN[pl.id] : ""}`);
+  } else {
+    Ls.push("【胸腔科門診預診摘要】" + nowStr());
+    const sex = ans.sex === "m" ? "男" : ans.sex === "f" ? "女" : "性別未填";
+    Ls.push(`病人：${ans.age ? ans.age + " 歲" : "年齡未填"} ${sex}｜${dxList(qById("visit"), "zh")[0] || "就診類型未填"}${pl.id !== "zh" ? "｜填寫語言：" + pl.zhName : ""}`);
+  }
   const fl = flagsFromOptions().filter(x => x.lv === "red");
-  if (fl.length) Ls.push("⚠ 紅旗：" + fl.map(x => x.text).join("；"));
-  Ls.push("主訴 CC：" + (labelsOf(qById("cc"),"dx").join("、") || "未填"));
-  Ls.push("現病史 HPI：");
+  if (fl.length) Ls.push((en ? "⚠ RED FLAGS: " : "⚠ 紅旗：") + fl.map(x => en ? x.en : x.text).join(S));
+  Ls.push((en ? "CC: " : "主訴 CC：") + (vals(qById("cc")) || (en ? "N/A" : "未填")));
+  Ls.push(en ? "HPI:" : "現病史 HPI：");
   groupsInFlow().forEach(g => {
-    const parts = flow().filter(q => q.grp === g && isAnswered(q)).map(q => `${q.dl} ${q.type === "nrs" ? ans[q.id] + "/10" : labelsOf(q,"dx").join("、")}`);
-    Ls.push(`  [${GROUPS[g].name}] ${parts.join("；") || "未填"}`);
+    const parts = flow().filter(q => q.grp === g && isAnswered(q)).map(q => `${lbl(q)} ${vals(q)}`);
+    Ls.push(`  [${en ? GROUP_EN[g] : GROUPS[g].name}] ${parts.join(S) || (en ? "N/A" : "未填")}`);
   });
   const ins = insights();
-  if (ins.length) Ls.push("臨床提醒：" + ins.map(x => x.text).join("；"));
-  ["smoke","sm_amt","sm_yrs","sm_quit","expo","occ","contact","pmh","meds","allergy","fhx"].forEach(id => {
+  if (ins.length) Ls.push((en ? "Alerts: " : "臨床提醒：") + ins.map(x => en ? x.en : x.text).join(S));
+  HX_IDS.forEach(id => {
     const q = qById(id);
-    if (flow().includes(q)) Ls.push(`${q.dl}：${labelsOf(q,"dx").join("、") || "未填"}`);
+    if (flow().includes(q)) Ls.push(`${lbl(q)}${C}${vals(q) || (en ? "N/A" : "未填")}`);
   });
-  if (isAnswered(qById("note"))) Ls.push("病人補充：" + ans.note.trim());
-  Ls.push(`（本摘要由病人自行點選產生，內容未經醫師確認｜胸訴 ${APP.version}）`);
+  if (isAnswered(qById("note"))) Ls.push((en ? "Patient's note: " : "病人補充：") + ans.note.trim());
+  Ls.push(en ? `(Self-reported by patient via tap-based intake; not verified by physician | Chest Intake ${APP.version})`
+             : `（本摘要由病人自行點選產生，內容未經醫師確認｜胸訴 ${APP.version}）`);
   return Ls.join("\n");
 }
 
@@ -1625,8 +1736,11 @@ function renderDoc(){
 
     ${isAnswered(qById("note")) ? `<h2>病人補充${pl.foreign ? ` <small>以${pl.zhName}輸入</small>` : ""}</h2><div class="saybox" style="font-size:18px">${esc(ans.note.trim())}</div>` : ""}
 
-    <h2>病歷摘要 <small>與「複製摘要文字」內容相同，可先在這裡修改再複製</small></h2>
-    <textarea class="docsum" id="docSum" spellcheck="false" aria-label="病歷摘要">${esc(docText())}</textarea>
+    <div class="sumhead"><h2>病歷摘要 <small>與「複製摘要文字」內容相同，可先修改再複製</small></h2>
+      <div class="seg sumlang" role="group" aria-label="摘要語言">
+        <button data-sl="zh" aria-pressed="${settings.docLang !== "en"}">中文</button>
+        <button data-sl="en" aria-pressed="${settings.docLang === "en"}">English</button></div></div>
+    <textarea class="docsum" id="docSum" spellcheck="false" aria-label="病歷摘要" lang="${settings.docLang === "en" ? "en" : "zh-Hant-TW"}">${esc(docText(settings.docLang))}</textarea>
 
     <div class="docactions">
       <button class="bigbtn ok" id="dCopy">複製摘要文字（貼到病歷）</button>
@@ -1639,7 +1753,19 @@ function renderDoc(){
   view.querySelectorAll("[data-ck]").forEach(c => c.onchange = () => { meta.checks[c.dataset.ck] = c.checked; save(); });
   const sum = document.getElementById("docSum");
   const fit = () => { sum.style.height = "auto"; sum.style.height = (sum.scrollHeight + 4) + "px"; };
+  let generated = sum.value;
   fit(); sum.addEventListener("input", fit);
+  /* 中英切換：記住醫師的選擇（存在這台裝置）；若摘要已被修改，切換前先確認 */
+  view.querySelectorAll("[data-sl]").forEach(b => b.onclick = () => {
+    const lg = b.dataset.sl;
+    if ((settings.docLang || "zh") === lg) return;
+    if (sum.value !== generated && !confirm("切換語言會重新產生摘要，您在框內的修改會消失。要繼續嗎？")) return;
+    settings.docLang = lg; store.set("settings", settings);
+    sum.value = generated = docText(lg);
+    sum.lang = lg === "en" ? "en" : "zh-Hant-TW";
+    view.querySelectorAll("[data-sl]").forEach(x => x.setAttribute("aria-pressed", String(x.dataset.sl === lg)));
+    fit();
+  });
   document.getElementById("dCopy").onclick = async () => {
     const t = sum.value;
     try { await navigator.clipboard.writeText(t); flash("已複製摘要文字"); }
