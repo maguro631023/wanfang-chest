@@ -285,6 +285,15 @@ footer{ padding:16px 14px 110px; text-align:center; color:var(--ink-soft); font-
 .about b{ display:block; font-size:calc(15px * var(--step)); margin-bottom:4px; }
 .seg.wrap button{ flex:1 1 30%; }
 /* ---------- v2.5：序號送出與取件 ---------- */
+.field select{ width:100%; min-height:52px; border:2px solid var(--line); border-radius:9px; padding:10px 12px;
+  font:inherit; font-size:calc(17px * var(--step)); font-weight:700; background:var(--paper); color:var(--ink); }
+.locked{ margin-top:8px; background:var(--surface); border-radius:9px; padding:10px 12px; font-size:calc(13px * var(--step)); }
+.locked div{ display:flex; gap:8px; align-items:baseline; padding:3px 0; }
+.locked b{ flex:0 0 3.2em; color:var(--ink-soft); font-weight:700; }
+.locked span{ flex:1; word-break:break-all; font-family:ui-monospace,Menlo,Consolas,monospace; }
+.locked::after{ content:"🔒 由管理者設定，平板端不需修改"; display:block; margin-top:6px; color:var(--ink-soft); }
+.locked.open::after{ content:"🔧 維護模式：可修改，關閉設定後恢復鎖定"; color:var(--amber); }
+#apiTitle{ cursor:default; }
 .field input[type="text"], .field input[type="password"]{ width:100%; min-height:52px; border:2px solid var(--line);
   border-radius:9px; padding:10px 12px; font:inherit; font-size:calc(16px * var(--step)); background:var(--paper); color:var(--ink); }
 .serialshow{ text-align:center; font-size:calc(58px * var(--step)); font-weight:800; letter-spacing:.06em; min-height:92px;
@@ -416,12 +425,17 @@ footer{ padding:16px 14px 110px; text-align:center; color:var(--ink-soft); font-
       </div></div>
     <button class="bigbtn ghost block" id="btnTest">測試語音</button>
     <p class="fnote" id="voiceInfo" style="margin-top:-8px"></p>
-    <div class="field"><span>診間連線（院內平板用）</span>
-      <input type="text" id="cfgClinic" placeholder="診間名稱，例如 胸腔科3診" autocomplete="off">
-      <input type="text" id="cfgApi" placeholder="伺服器網址 https://xxx.up.railway.app" autocomplete="off" inputmode="url" style="margin-top:8px">
-      <input type="password" id="cfgKey" placeholder="診間金鑰" autocomplete="off" style="margin-top:8px">
+    <div class="field"><span id="apiTitle">診間連線（院內平板用）</span>
+      <select id="cfgClinicSel" aria-label="診間"></select>
+      <input type="text" id="cfgClinic" placeholder="診間名稱" autocomplete="off" hidden>
+      <div class="locked" id="lockBox">
+        <div><b>伺服器</b><span id="apiShow"></span></div>
+        <div><b>金鑰</b><span id="keyShow"></span></div>
+      </div>
+      <input type="text" id="cfgApi" placeholder="伺服器網址" autocomplete="off" inputmode="url" hidden>
+      <input type="password" id="cfgKey" placeholder="診間金鑰" autocomplete="off" hidden>
       <button class="bigbtn ghost block" id="btnPing" style="margin-top:8px">測試連線</button>
-      <p class="fnote" id="apiNote">三個欄位都填好才會啟用「送出給醫師」。留空則完全不連線，資料只留在這台裝置。</p></div>
+      <p class="fnote" id="apiNote"></p></div>
     <div class="field"><span>用手機掃描開啟</span>
       <div class="qrbox">
         <img class="qr" src="assets/qr.svg" alt="胸訴網址的 QR Code" onerror="this.onerror=null;this.src='assets/qr.png'">
@@ -445,8 +459,24 @@ footer{ padding:16px 14px 110px; text-align:center; color:var(--ink-soft); font-
 /* ============================================================
    版本與預期用途（院內規範用；改版時一併更新）
    ============================================================ */
+/* ============================================================
+   院內部署設定
+   ------------------------------------------------------------
+   伺服器網址與診間金鑰固定在這裡，平板端不需要也不能自行修改，
+   只要選診間就好。要改網址或換金鑰時，改這裡再推一次版本；
+   或在設定頁連點五下「診間連線」標題進入維護模式，臨時修改。
+
+   ⚠ 本檔案在 GitHub Pages 上是公開的，寫在這裡的金鑰任何人都看得到，
+     只能防止隨意掃描，不能視為真正的機密。伺服器端仍依賴：
+     限制來源網域、流量限制、逾時自動刪除、不存姓名與病歷號。
+   ============================================================ */
+const DEPLOY = {
+  api:"https://chest-server-production.up.railway.app",
+  key:"fe5573743a86302c2cf80b139760514bca07086df9c8b13b",
+  clinics:["胸腔科1診","胸腔科2診","胸腔科3診","胸腔科4診","胸腔科5診"]
+};
 const APP = {
-  version:"v2.5",
+  version:"v2.6",
   date:"2026-09-11",
   url:"https://maguro631023.github.io/wanfang-chest/",
   purpose:"協助門診病人於看診前，以點選、圖示與語音整理症狀與病史，產出供醫師參考的摘要。不做診斷，不提供治療建議，不取代醫師問診。",
@@ -889,6 +919,8 @@ let ans      = store.get("ans", {});
 let meta     = store.get("meta", {});
 let settings = Object.assign({ step:"1", autoread:"on", lang:"zh", rate:"0.88", text:"on", voices:{}, docLang:"zh", api:"", key:"", clinic:"" }, store.get("settings", {}));
 settings.voices = settings.voices || {};
+/* 網址與金鑰一律以程式內的設定為準，避免平板留著舊值 */
+if (DEPLOY.api){ settings.api = DEPLOY.api; settings.key = DEPLOY.key; store.set("settings", settings); }
 let screen   = "home";   // home | notice | q | review | doc
 let curId    = null;
 let returnToReview = false;
@@ -2040,18 +2072,43 @@ document.getElementById("btnSet").onclick = () => {
   paintShare(); paintInstall(); paintVoices(); paintApi();
   dlg.showModal();
 };
-/* 診間連線設定 */
+/* 診間連線設定：診間用下拉選單，網址與金鑰鎖定（連點五下標題可臨時解鎖） */
 const cfg = { clinic:document.getElementById("cfgClinic"), api:document.getElementById("cfgApi"), key:document.getElementById("cfgKey") };
+const sel = document.getElementById("cfgClinicSel"), lockBox = document.getElementById("lockBox");
+let maint = false;
+const maskKey = k => !k ? "（未設定）" : k.length <= 12 ? "••••" : k.slice(0, 6) + "…" + k.slice(-4);
 function paintApi(){
   cfg.clinic.value = settings.clinic || ""; cfg.api.value = settings.api || ""; cfg.key.value = settings.key || "";
-  document.getElementById("apiNote").textContent = apiOn()
-    ? `已啟用：病人填完後可用看診號碼送出給醫師（${settings.clinic}）。資料只保留數小時，看診後可立即刪除。`
-    : "三個欄位都填好才會啟用「送出給醫師」。留空則完全不連線，資料只留在這台裝置。";
+  const list = DEPLOY.clinics.slice();
+  if (settings.clinic && !list.includes(settings.clinic)) list.push(settings.clinic);
+  sel.innerHTML = `<option value="">請選擇診間…</option>` +
+    list.map(c => `<option value="${esc(c)}"${c === settings.clinic ? " selected" : ""}>${esc(c)}</option>`).join("");
+  document.getElementById("apiShow").textContent = settings.api || "（未設定）";
+  document.getElementById("keyShow").textContent = maint ? (settings.key || "（未設定）") : maskKey(settings.key);
+  lockBox.hidden = maint; cfg.api.hidden = !maint; cfg.key.hidden = !maint;
+  lockBox.classList.toggle("open", maint);
+  document.getElementById("apiNote").textContent = !settings.clinic
+    ? "請先選擇這台平板所在的診間，才會啟用「送出給醫師」。"
+    : apiOn() ? `已啟用：病人填完後可用看診號碼送出給醫師（${settings.clinic}）。資料只保留數小時，看診後可立即刪除。`
+              : "伺服器尚未設定，資料只留在這台裝置。";
 }
-Object.keys(cfg).forEach(k => cfg[k].addEventListener("change", () => {
-  settings[k] = cfg[k].value.trim(); store.set("settings", settings); paintApi();
+sel.addEventListener("change", () => {
+  settings.clinic = sel.value; store.set("settings", settings); paintApi();
   if (screen !== "q") render();
+});
+["api","key"].forEach(k => cfg[k].addEventListener("change", () => {
+  settings[k] = cfg[k].value.trim(); store.set("settings", settings); paintApi();
 }));
+/* 維護模式：連點五下標題 */
+(() => {
+  let n = 0, t = null;
+  document.getElementById("apiTitle").addEventListener("click", () => {
+    clearTimeout(t); t = setTimeout(() => { n = 0; }, 1500);
+    if (++n < 5) return;
+    n = 0; maint = true; paintApi();
+    flash("維護模式：可修改伺服器網址與金鑰");
+  });
+})();
 document.getElementById("btnPing").onclick = async () => {
   const note = document.getElementById("apiNote");
   Object.keys(cfg).forEach(k => { settings[k] = cfg[k].value.trim(); });
@@ -2065,7 +2122,7 @@ document.getElementById("btnPing").onclick = async () => {
   } catch(e){ note.textContent = "連線失敗：" + apiMsg(e); }
 };
 
-document.getElementById("btnClose").onclick = () => dlg.close();
+document.getElementById("btnClose").onclick = () => { maint = false; dlg.close(); };
 
 /* 語音選單：列出這台裝置上目前語言可用的語音，建議的排最前面 */
 const vCode = () => (L().foreign ? L().code : "zh-TW");
