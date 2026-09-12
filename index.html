@@ -284,6 +284,33 @@ footer{ padding:16px 14px 110px; text-align:center; color:var(--ink-soft); font-
 .about{ background:var(--surface); border-radius:10px; padding:12px 14px; font-size:calc(13.5px * var(--step)); line-height:1.65; }
 .about b{ display:block; font-size:calc(15px * var(--step)); margin-bottom:4px; }
 .seg.wrap button{ flex:1 1 30%; }
+/* ---------- v2.5：序號送出與取件 ---------- */
+.field input[type="text"], .field input[type="password"]{ width:100%; min-height:52px; border:2px solid var(--line);
+  border-radius:9px; padding:10px 12px; font:inherit; font-size:calc(16px * var(--step)); background:var(--paper); color:var(--ink); }
+.serialshow{ text-align:center; font-size:calc(58px * var(--step)); font-weight:800; letter-spacing:.06em; min-height:92px;
+  border:3px solid var(--line); border-radius:var(--radius); background:var(--surface); margin-bottom:12px; }
+.clinicname{ text-align:center; font-size:calc(18px * var(--step)); font-weight:700; color:var(--ink-soft); margin:0 0 10px; }
+.sendok{ text-align:center; padding:22px 12px; }
+.sendok .big{ font-size:calc(72px * var(--step)); line-height:1.1; }
+.sendok h1{ font-size:calc(30px * var(--step)); margin:10px 0 8px; }
+.sendok p{ font-size:calc(20px * var(--step)); color:var(--ink-soft); margin:0 0 8px; }
+.sendok .sn{ display:inline-block; background:var(--ink); color:#fff; border-radius:10px; padding:6px 20px;
+  font-size:calc(30px * var(--step)); font-weight:800; letter-spacing:.06em; }
+.pickup{ border:2px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:16px; background:#FAFCFC; }
+.pickup .row{ display:flex; gap:8px; flex-wrap:wrap; }
+.pickup input{ flex:1 1 140px; min-width:0; min-height:54px; border:2px solid var(--line); border-radius:9px;
+  padding:8px 12px; font:inherit; font-size:calc(20px * var(--step)); font-weight:700; text-align:center; }
+.pickup .bigbtn{ flex:0 0 auto; min-height:54px; padding:10px 20px; font-size:calc(17px * var(--step)); }
+.pickup h3{ margin:0 0 8px; font-size:calc(17px * var(--step)); display:flex; align-items:baseline; gap:8px; }
+.pickup h3 small{ font-weight:500; color:var(--ink-soft); font-size:calc(13px * var(--step)); }
+.plist{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.plist button{ border:2px solid var(--line); background:var(--paper); border-radius:10px; padding:8px 14px;
+  font-weight:800; font-size:calc(16px * var(--step)); min-height:46px; }
+.plist button.red{ border-color:var(--red); color:var(--red); }
+.plist button small{ display:block; font-weight:500; font-size:calc(12px * var(--step)); color:var(--ink-soft); }
+.pmsg{ margin:10px 0 0; font-size:calc(15px * var(--step)); font-weight:700; }
+.pmsg.err{ color:var(--red); } .pmsg.ok{ color:var(--teal-dark); }
+@media print{ .pickup{ display:none; } }
 .sumhead{ display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:8px 16px; margin:22px 0 8px; }
 .sumhead h2{ margin:0; }
 .sumlang{ flex:0 0 auto; }
@@ -389,6 +416,12 @@ footer{ padding:16px 14px 110px; text-align:center; color:var(--ink-soft); font-
       </div></div>
     <button class="bigbtn ghost block" id="btnTest">測試語音</button>
     <p class="fnote" id="voiceInfo" style="margin-top:-8px"></p>
+    <div class="field"><span>診間連線（院內平板用）</span>
+      <input type="text" id="cfgClinic" placeholder="診間名稱，例如 胸腔科3診" autocomplete="off">
+      <input type="text" id="cfgApi" placeholder="伺服器網址 https://xxx.up.railway.app" autocomplete="off" inputmode="url" style="margin-top:8px">
+      <input type="password" id="cfgKey" placeholder="診間金鑰" autocomplete="off" style="margin-top:8px">
+      <button class="bigbtn ghost block" id="btnPing" style="margin-top:8px">測試連線</button>
+      <p class="fnote" id="apiNote">三個欄位都填好才會啟用「送出給醫師」。留空則完全不連線，資料只留在這台裝置。</p></div>
     <div class="field"><span>用手機掃描開啟</span>
       <div class="qrbox">
         <img class="qr" src="assets/qr.svg" alt="胸訴網址的 QR Code" onerror="this.onerror=null;this.src='assets/qr.png'">
@@ -413,7 +446,7 @@ footer{ padding:16px 14px 110px; text-align:center; color:var(--ink-soft); font-
    版本與預期用途（院內規範用；改版時一併更新）
    ============================================================ */
 const APP = {
-  version:"v2.4",
+  version:"v2.5",
   date:"2026-09-11",
   url:"https://maguro631023.github.io/wanfang-chest/",
   purpose:"協助門診病人於看診前，以點選、圖示與語音整理症狀與病史，產出供醫師參考的摘要。不做診斷，不提供治療建議，不取代醫師問診。",
@@ -854,7 +887,7 @@ const store = (() => {
 
 let ans      = store.get("ans", {});
 let meta     = store.get("meta", {});
-let settings = Object.assign({ step:"1", autoread:"on", lang:"zh", rate:"0.88", text:"on", voices:{}, docLang:"zh" }, store.get("settings", {}));
+let settings = Object.assign({ step:"1", autoread:"on", lang:"zh", rate:"0.88", text:"on", voices:{}, docLang:"zh", api:"", key:"", clinic:"" }, store.get("settings", {}));
 settings.voices = settings.voices || {};
 let screen   = "home";   // home | notice | q | review | doc
 let curId    = null;
@@ -1370,6 +1403,8 @@ function render(){
   paintStepper();
   if (screen === "home") renderHome();
   else if (screen === "notice") renderNotice();
+  else if (screen === "send") renderSend();
+  else if (screen === "sent") renderSent();
   else if (screen === "q") renderQ();
   else if (screen === "review") renderReview();
   else renderDoc();
@@ -1459,7 +1494,7 @@ function renderNotice(){
       <button class="bigbtn ghost block" id="nBack">${esc(T("home"))}</button>
     </div>`;
   document.getElementById("nOk").onclick = () => {
-    meta = { started:nowStr(), checks:{}, noticeAck:nowStr() };
+    meta = { started:nowStr(), startedAt:Date.now(), checks:{}, noticeAck:nowStr() };
     ans = { _lang:settings.lang }; save();
     go(flow()[0].id);
   };
@@ -1649,7 +1684,8 @@ function renderReview(){
     <h1 class="qtext" style="margin-bottom:12px">${esc(T("reviewTitle"))}</h1>
     ${box}
     <div class="homeactions">
-      <button class="bigbtn ok startbtn" id="rSay">${esc(T("sayDoc"))}</button>
+      ${apiOn() ? `<button class="bigbtn ok startbtn" id="rSend">📨 送出給醫師</button>` : ""}
+      <button class="bigbtn ${apiOn() ? "ghost block" : "ok startbtn"}" id="rSay">${esc(T("sayDoc"))}</button>
       ${foreign() ? `<button class="bigbtn ghost block" id="rMine">${esc(T("sayMine"))}</button>` : ""}
       <button class="bigbtn ghost block" id="rDoc">${esc(T("toDoc"))}</button>
     </div>
@@ -1670,6 +1706,8 @@ function renderReview(){
     fq.forEach((q, i) => tts(code === "zh-TW" ? sentence(q) : tq(q) + " " + answerTr(q) + ".", code, i > 0));
   };
   document.getElementById("rDoc").onclick = () => { stopAll(); screen = "doc"; render(); window.scrollTo(0,0); };
+  const rs = document.getElementById("rSend");
+  if (rs) rs.onclick = () => { stopAll(); screen = "send"; render(); window.scrollTo(0,0); };
   document.getElementById("rNew").onclick = wipe;
   view.querySelectorAll("[data-q]").forEach(b => b.onclick = () => { returnToReview = true; go(b.dataset.q); });
 }
@@ -1679,7 +1717,9 @@ function renderDoc(){
   document.documentElement.lang = "zh-Hant-TW";
   if (!Object.keys(ans).filter(k => k !== "_lang").length){
     view.innerHTML = `<div class="doc"><h1 class="qtext">醫師摘要</h1>
-      <p class="qhint">目前沒有病人填答。請病人在「病人」模式填完後再切換到這裡。</p></div>`;
+      ${pickupHTML()}
+      <p class="qhint">${apiOn() ? "輸入病人的看診號碼取回填答，或按「今日清單」查看。" : "目前沒有病人填答。請病人在「病人」模式填完後再切換到這裡。"}</p></div>`;
+    bindPickup();
     return;
   }
   meta.checks = meta.checks || {};
@@ -1716,7 +1756,8 @@ function renderDoc(){
       `<dt>${esc(q.dl)}</dt><dd class="${isAnswered(q) ? "" : "miss"}">${isAnswered(q) ? esc(labelsOf(q,"dx").join("、")) : "未回答"}</dd>`).join("");
 
   view.innerHTML = `<div class="doc">
-    <h1 class="qtext">醫師摘要 <small style="font-size:14px;font-weight:500;color:var(--ink-soft)">開始填寫 ${esc(meta.started || "—")}</small></h1>
+    ${pickupHTML()}
+    <h1 class="qtext">醫師摘要 <small style="font-size:14px;font-weight:500;color:var(--ink-soft)">${meta.serial ? "看診號碼 " + esc(meta.serial) + "｜" : ""}填寫時間 ${esc(meta.started || "—")}</small></h1>
     <div class="pt">${esc(ans.age || "—")} 歲　${sex}<span>${esc(labelsOf(qById("visit"),"dx")[0] || "就診類型未填")}</span>${pl.id !== "zh" ? `<span>填寫語言：${pl.zhName}</span>` : ""}</div>
 
     ${redF.length ? `<h2>紅旗 <small>病人已被提醒告知護理人員</small></h2><div class="flags">${redF.map(x => `<div class="flag red">${esc(x.text)}</div>`).join("")}</div>` : ""}
@@ -1745,6 +1786,7 @@ function renderDoc(){
     <div class="docactions">
       <button class="bigbtn ok" id="dCopy">複製摘要文字（貼到病歷）</button>
       <button class="bigbtn ghost" id="dPrint">列印</button>
+      ${apiOn() && meta.remoteId ? `<button class="bigbtn warn" id="dDel">看完診，刪除伺服器上的資料</button>` : ""}
       <button class="bigbtn ghost" id="dBack">回到病人畫面</button>
     </div>
     <p class="disclaim">本摘要由病人自行點選產生，內容未經醫師確認。臨床提醒依公開篩檢準則的條件比對，僅供問診參考。胸訴 ${APP.version}（${APP.date}）・研發測試中，非醫療器材。</p>
@@ -1775,6 +1817,15 @@ function renderDoc(){
       ta.remove();
     }
   };
+  bindPickup();
+  const dd = document.getElementById("dDel");
+  if (dd) dd.onclick = async () => {
+    if (!confirm("確定刪除伺服器上這位病人的填答嗎？畫面上的內容會一併清除。")) return;
+    dd.disabled = true; dd.textContent = "刪除中…";
+    try { await api("/api/visits/" + meta.remoteId, { method:"DELETE" }); flash("已刪除伺服器上的資料"); }
+    catch(e){ alert(apiMsg(e)); }
+    ans = {}; meta = { checks:{} }; save(); pickList = null; render(); window.scrollTo(0,0);
+  };
   document.getElementById("dPrint").onclick = () => window.print();
   document.getElementById("dBack").onclick = () => { screen = Object.keys(ans).filter(k => k !== "_lang").length ? "review" : "home"; render(); };
 }
@@ -1784,6 +1835,164 @@ function wipe(){
   ans = {}; meta = {}; alerted.clear(); store.del("ans"); store.del("meta");
   stopAll();
   screen = "home"; returnToReview = false; render(); window.scrollTo(0,0);
+}
+
+/* ============================================================
+   7.5 伺服器連線（院內平板：病人用序號送出，醫師用序號取回）
+   ------------------------------------------------------------
+   · 連線資訊存在這台裝置的設定裡，三欄都填才啟用。
+   · 送出的是答案代碼與時間，不含姓名、病歷號。
+   · 伺服器逾時自動刪除；醫師看完可按「刪除伺服器上的資料」。
+   · 沒設定或連不上時，App 照常單機運作，不影響問診。
+   ============================================================ */
+const apiOn = () => !!(settings.api && settings.key && settings.clinic);
+const apiBase = () => String(settings.api || "").replace(/\/+$/, "");
+async function api(path, opt){
+  const o = Object.assign({ headers:{} }, opt);
+  o.headers = Object.assign({ "X-Clinic-Key":settings.key }, o.headers);
+  if (o.body) o.headers["Content-Type"] = "application/json";
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 12000);
+  try {
+    const r = await fetch(apiBase() + path, Object.assign({ signal:ctrl.signal }, o));
+    const txt = await r.text();
+    let data; try { data = JSON.parse(txt); } catch(e){ data = { error:"bad_response" }; }
+    if (!r.ok){ const e = new Error(data.error || r.status); e.status = r.status; e.data = data; throw e; }
+    return data;
+  } finally { clearTimeout(timer); }
+}
+const API_MSG = {
+  bad_clinic_key:"診間金鑰不正確，請到設定確認。",
+  not_found:"找不到這個序號的資料。請確認序號，或病人是否已送出。",
+  server_not_configured:"伺服器尚未設定金鑰，請聯絡管理者。",
+  too_many_requests:"操作太頻繁，請稍候再試。",
+  bad_response:"伺服器回覆格式不正確。"
+};
+const apiMsg = e => API_MSG[e && (e.data && e.data.error || e.message)] ||
+  (e && e.name === "AbortError" ? "連線逾時，請確認網路。" : "連線失敗，請確認網路與伺服器網址。");
+
+/* 不記名統計：沒有序號、沒有自由輸入文字，年齡只送十歲一組 */
+function statsPayload(seconds, completed){
+  const f = flow();
+  const red = flagsFromOptions().filter(x => x.lv === "red");
+  const age = Number(ans.age);
+  return {
+    clinic:settings.clinic, lang:ans._lang || settings.lang,
+    age_band: age ? (age >= 90 ? "90+" : (Math.floor(age / 10) * 10) + "-" + (Math.floor(age / 10) * 10 + 9)) : "",
+    sex:ans.sex || "",
+    cc: Array.isArray(ans.cc) ? ans.cc.slice() : [],
+    red: red.length > 0, red_kinds: red.map(x => x.text),
+    answered: f.filter(isAnswered).length, skipped: f.filter(q => !isAnswered(q)).length, total: f.length,
+    seconds, completed, device: matchMedia("(pointer:coarse)").matches ? "touch" : "desktop", version:APP.version
+  };
+}
+function sendStats(seconds, completed){
+  if (!apiOn()) return;
+  api("/api/stats", { method:"POST", body:JSON.stringify(statsPayload(seconds, completed)) }).catch(() => {});
+}
+
+/* ---------- 病人端：輸入序號送出 ---------- */
+function renderSend(){
+  const sn = String(meta.serial || "");
+  view.innerHTML = `
+    <h1 class="qtext" style="margin-bottom:6px">請輸入您的看診號碼</h1>
+    <p class="qhint">號碼在您的掛號單上。輸入後按「送出給醫師」。</p>
+    <p class="clinicname">${esc(settings.clinic)}</p>
+    <div class="numpad"><div class="serialshow" id="snShow">${sn ? esc(sn) : "&nbsp;"}</div>
+      <div class="keys">${[1,2,3,4,5,6,7,8,9].map(n => `<button data-k="${n}">${n}</button>`).join("")}
+        <button class="fn" data-k="c">清除</button><button data-k="0">0</button><button class="fn" data-k="b">⌫ 刪一個</button></div></div>
+    <p class="pmsg" id="sendMsg"></p>
+    <div class="homeactions" style="margin-top:18px">
+      <button class="bigbtn ok startbtn" id="sSend">送出給醫師</button>
+      <button class="bigbtn ghost block" id="sBack">回上一頁</button>
+    </div>`;
+  const show = document.getElementById("snShow"), msg = document.getElementById("sendMsg");
+  view.querySelectorAll("[data-k]").forEach(b => b.onclick = () => {
+    let v = String(meta.serial || ""), k = b.dataset.k;
+    if (k === "c") v = ""; else if (k === "b") v = v.slice(0, -1); else if (v.length < 6) v += k;
+    meta.serial = v; save();
+    show.innerHTML = v ? esc(v) : "&nbsp;";
+    if (k !== "c" && k !== "b") say(k, k, null);
+  });
+  document.getElementById("sBack").onclick = () => { screen = "review"; render(); };
+  document.getElementById("sSend").onclick = async () => {
+    const v = String(meta.serial || "").trim();
+    if (!v){ msg.className = "pmsg err"; msg.textContent = "請先輸入看診號碼。"; return; }
+    const btn = document.getElementById("sSend");
+    btn.disabled = true; btn.textContent = "送出中…";
+    msg.className = "pmsg"; msg.textContent = "";
+    try {
+      const red = flagsFromOptions().filter(x => x.lv === "red");
+      await api("/api/visits", { method:"POST", body:JSON.stringify({
+        clinic:settings.clinic, serial:v, answers:ans,
+        cc:labelsOf(qById("cc"), "dx").join("、"), red:red.length > 0,
+        lang:ans._lang || settings.lang, version:APP.version }) });
+      sendStats(meta.started ? Math.round((Date.now() - (meta.startedAt || Date.now())) / 1000) : null, true);
+      meta.sent = nowStr(); save();
+      screen = "sent"; render(); window.scrollTo(0,0);
+    } catch(e){
+      btn.disabled = false; btn.textContent = "送出給醫師";
+      msg.className = "pmsg err";
+      msg.textContent = apiMsg(e) + " 也可以直接把平板交給醫師。";
+    }
+  };
+}
+function renderSent(){
+  view.innerHTML = `<div class="sendok">
+      <div class="big" aria-hidden="true">✅</div>
+      <h1>送出完成</h1>
+      <p>看診號碼</p><p><span class="sn">${esc(meta.serial || "")}</span></p>
+      <p style="margin-top:16px">請把平板交還給工作人員，<br>然後在候診區等候叫號。</p>
+    </div>
+    <div class="homeactions">
+      <button class="bigbtn ghost block" id="kBack">回到我填的內容</button>
+      <button class="bigbtn warn block" id="kNew">換下一位病人（清除這台平板）</button>
+    </div>`;
+  document.getElementById("kBack").onclick = () => { screen = "review"; render(); };
+  document.getElementById("kNew").onclick = wipe;
+}
+
+/* ---------- 醫師端：用序號取回 ---------- */
+let pickList = null;
+function pickupHTML(){
+  if (!apiOn()) return "";
+  return `<div class="pickup">
+    <h3>用看診號碼取回病人填答 <small>${esc(settings.clinic)}</small></h3>
+    <div class="row">
+      <input id="pkSerial" inputmode="numeric" placeholder="看診號碼" aria-label="看診號碼" value="${esc(meta.serial || "")}">
+      <button class="bigbtn ok" id="pkGet">讀取</button>
+      <button class="bigbtn ghost" id="pkList">今日清單</button>
+    </div>
+    <p class="pmsg" id="pkMsg"></p>
+    ${pickList ? `<div class="plist">${pickList.length ? pickList.map(v => `<button class="${v.red ? "red" : ""}" data-pk="${esc(v.serial)}">${esc(v.serial)}${v.cc ? `<small>${esc(String(v.cc).slice(0,14))}</small>` : ""}</button>`).join("") : "<span class=\"qhint\">目前沒有待看的填答。</span>"}</div>` : ""}
+  </div>`;
+}
+function bindPickup(){
+  if (!apiOn()) return;
+  const msg = document.getElementById("pkMsg");
+  const load = async serial => {
+    if (!serial){ msg.className = "pmsg err"; msg.textContent = "請輸入看診號碼。"; return; }
+    msg.className = "pmsg"; msg.textContent = "讀取中…";
+    try {
+      const d = await api(`/api/visits?clinic=${encodeURIComponent(settings.clinic)}&serial=${encodeURIComponent(serial)}`);
+      ans = d.visit.answers || {};
+      meta = Object.assign({}, meta, { serial, checks:meta.checks || {}, remoteId:d.visit.id,
+        started: d.visit.created_at ? new Date(d.visit.created_at).toLocaleString("zh-TW", { hour12:false }) : meta.started });
+      save(); alerted.clear(); pickList = null;
+      screen = "doc"; render(); window.scrollTo(0,0);
+    } catch(e){ msg.className = "pmsg err"; msg.textContent = apiMsg(e); }
+  };
+  document.getElementById("pkGet").onclick = () => load(document.getElementById("pkSerial").value.trim());
+  document.getElementById("pkSerial").addEventListener("keydown", e => { if (e.key === "Enter") load(e.target.value.trim()); });
+  document.getElementById("pkList").onclick = async () => {
+    msg.className = "pmsg"; msg.textContent = "讀取中…";
+    try {
+      const d = await api(`/api/visits?clinic=${encodeURIComponent(settings.clinic)}`);
+      pickList = d.list || []; msg.textContent = "";
+      renderDoc();
+    } catch(e){ msg.className = "pmsg err"; msg.textContent = apiMsg(e); }
+  };
+  view.querySelectorAll("[data-pk]").forEach(b => b.onclick = () => load(b.dataset.pk));
 }
 
 /* ============================================================
@@ -1828,9 +2037,34 @@ document.getElementById("btnSet").onclick = () => {
   document.getElementById("voiceInfo").textContent = !hasTTS ? "這個瀏覽器不支援語音朗讀。"
     : l.foreign ? (voiceOK(l.id) ? `這台裝置有${l.zhName}語音。` : `這台裝置沒有${l.zhName}語音，會改用華語唸；可到系統設定下載語音資料。`)
     : ((speechSynthesis.getVoices() || []).some(v => /zh/i.test(v.lang)) ? "這台裝置有中文語音。" : "尚未偵測到中文語音；若按測試沒有聲音，請到系統設定下載中文語音。");
-  paintShare(); paintInstall(); paintVoices();
+  paintShare(); paintInstall(); paintVoices(); paintApi();
   dlg.showModal();
 };
+/* 診間連線設定 */
+const cfg = { clinic:document.getElementById("cfgClinic"), api:document.getElementById("cfgApi"), key:document.getElementById("cfgKey") };
+function paintApi(){
+  cfg.clinic.value = settings.clinic || ""; cfg.api.value = settings.api || ""; cfg.key.value = settings.key || "";
+  document.getElementById("apiNote").textContent = apiOn()
+    ? `已啟用：病人填完後可用看診號碼送出給醫師（${settings.clinic}）。資料只保留數小時，看診後可立即刪除。`
+    : "三個欄位都填好才會啟用「送出給醫師」。留空則完全不連線，資料只留在這台裝置。";
+}
+Object.keys(cfg).forEach(k => cfg[k].addEventListener("change", () => {
+  settings[k] = cfg[k].value.trim(); store.set("settings", settings); paintApi();
+  if (screen !== "q") render();
+}));
+document.getElementById("btnPing").onclick = async () => {
+  const note = document.getElementById("apiNote");
+  Object.keys(cfg).forEach(k => { settings[k] = cfg[k].value.trim(); });
+  store.set("settings", settings);
+  if (!apiOn()){ note.textContent = "請先填好診間名稱、伺服器網址與診間金鑰。"; return; }
+  note.textContent = "測試中…";
+  try {
+    const h = await api("/api/health");
+    await api(`/api/visits?clinic=${encodeURIComponent(settings.clinic)}`);
+    note.textContent = `連線成功。資料保留 ${h.retain_hours} 小時後自動刪除。`;
+  } catch(e){ note.textContent = "連線失敗：" + apiMsg(e); }
+};
+
 document.getElementById("btnClose").onclick = () => dlg.close();
 
 /* 語音選單：列出這台裝置上目前語言可用的語音，建議的排最前面 */
@@ -1937,7 +2171,11 @@ function showUpdate(worker){
 }
 if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")){
   let reloading = false;
-  navigator.serviceWorker.addEventListener("controllerchange", () => { if (reloading) return; reloading = true; location.reload(); });
+  /* 第一次註冊時 controller 由無變有，這不是換版本，不該重新整理（會打斷填答） */
+  const hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hadController || reloading) return; reloading = true; location.reload();
+  });
   navigator.serviceWorker.register("sw.js").then(reg => {
     swReg = reg;
     if (reg.waiting && navigator.serviceWorker.controller) showUpdate(reg.waiting);
