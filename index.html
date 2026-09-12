@@ -284,6 +284,17 @@ footer{ padding:16px 14px 110px; text-align:center; color:var(--ink-soft); font-
 .about{ background:var(--surface); border-radius:10px; padding:12px 14px; font-size:calc(13.5px * var(--step)); line-height:1.65; }
 .about b{ display:block; font-size:calc(15px * var(--step)); margin-bottom:4px; }
 .seg.wrap button{ flex:1 1 30%; }
+.clinictag{ flex:0 0 auto; max-width:46vw; border:1.5px solid rgba(255,255,255,.3); background:rgba(255,255,255,.1);
+  color:#fff; border-radius:999px; padding:7px 14px; min-height:40px; font-weight:700;
+  font-size:calc(14px * var(--step)); display:flex; align-items:center; gap:7px; margin-right:10px; }
+.clinictag i{ width:9px; height:9px; border-radius:50%; background:#5DCAA5; flex:0 0 auto; font-style:normal; }
+.clinictag.off{ border-style:dashed; color:#FAC775; }
+.clinictag.off i{ background:#FAC775; }
+.clinictag b{ font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.clinictag small{ font-weight:500; opacity:.72; white-space:nowrap; }
+@media (max-width:620px){ .clinictag small{ display:none; } .clinictag{ padding:7px 11px; margin-right:6px; }
+  .brand{ font-size:calc(19px * var(--step)); } .brand small{ display:none; } }
+@media print{ .clinictag{ display:none; } }
 /* ---------- v2.5：序號送出與取件 ---------- */
 .field select{ width:100%; min-height:52px; border:2px solid var(--line); border-radius:9px; padding:10px 12px;
   font:inherit; font-size:calc(17px * var(--step)); font-weight:700; background:var(--paper); color:var(--ink); }
@@ -366,6 +377,7 @@ footer{ padding:16px 14px 110px; text-align:center; color:var(--ink-soft); font-
 <div class="app">
   <header class="topbar">
     <div class="brand">胸訴<small id="brandSub">胸腔科門診問診・研發測試版</small></div>
+    <button class="clinictag" id="clinicTag" hidden></button>
     <div class="modeswitch" role="group" aria-label="模式">
       <button id="mPt"  aria-pressed="true">病人</button>
       <button id="mDoc" aria-pressed="false">醫師</button>
@@ -476,7 +488,7 @@ const DEPLOY = {
   clinics:["胸腔科1診","胸腔科2診","胸腔科3診","胸腔科4診","胸腔科5診"]
 };
 const APP = {
-  version:"v2.6",
+  version:"v2.7",
   date:"2026-09-11",
   url:"https://maguro631023.github.io/wanfang-chest/",
   purpose:"協助門診病人於看診前，以點選、圖示與語音整理症狀與病史，產出供醫師參考的摘要。不做診斷，不提供治療建議，不取代醫師問診。",
@@ -1423,6 +1435,17 @@ function paintChrome(){
   document.getElementById("brandSub").textContent = TT("brandSub");
   const ft = TT("footer");
   ["ft0","ft1","ft2"].forEach((id, i) => { document.getElementById(id).textContent = ft[i] || ""; });
+  const tag = document.getElementById("clinicTag");
+  if (!DEPLOY.api){ tag.hidden = true; }
+  else {
+    tag.hidden = false;
+    tag.classList.toggle("off", !settings.clinic);
+    tag.innerHTML = settings.clinic
+      ? `<i aria-hidden="true"></i><b>${esc(settings.clinic)}</b><small>已連線</small>`
+      : `<i aria-hidden="true"></i><b>未設定診間</b>`;
+    tag.setAttribute("aria-label", settings.clinic ? `連線診間 ${settings.clinic}` : "尚未設定診間");
+    tag.title = settings.clinic ? `連線診間：${settings.clinic}（點一下可更換）` : "尚未選擇診間，點一下設定";
+  }
   document.getElementById("alertHead").textContent = T("alertHead");
   document.getElementById("alertOk").textContent = T("alertOk");
 }
@@ -2064,6 +2087,7 @@ document.querySelectorAll(".seg[data-set]").forEach(seg => seg.addEventListener(
   else { settings[seg.dataset.set] = b.dataset.v; applySettings(); }
   if (screen !== "doc") render();
 }));
+document.getElementById("clinicTag").onclick = () => document.getElementById("btnSet").click();
 document.getElementById("btnSet").onclick = () => {
   const l = L();
   document.getElementById("voiceInfo").textContent = !hasTTS ? "這個瀏覽器不支援語音朗讀。"
