@@ -292,7 +292,7 @@ footer{ padding:16px 14px 110px; text-align:center; color:var(--ink-soft); font-
 .clinictag.off i{ background:#FAC775; }
 .clinictag b{ font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .clinictag small{ font-weight:500; opacity:.72; white-space:nowrap; }
-@media (max-width:620px){ .clinictag small{ display:none; } .clinictag{ padding:7px 11px; margin-right:6px; }
+@media (max-width:620px){ .clinictag{ padding:7px 10px; margin-right:6px; font-size:calc(13px * var(--step)); }
   .brand{ font-size:calc(19px * var(--step)); } .brand small{ display:none; } }
 @media print{ .clinictag{ display:none; } }
 /* ---------- v2.5：序號送出與取件 ---------- */
@@ -439,6 +439,7 @@ footer{ padding:16px 14px 110px; text-align:center; color:var(--ink-soft); font-
     <p class="fnote" id="voiceInfo" style="margin-top:-8px"></p>
     <div class="field"><span id="apiTitle">診間連線（院內平板用）</span>
       <select id="cfgClinicSel" aria-label="診間"></select>
+      <select id="cfgSessionSel" aria-label="時段" style="margin-top:8px"></select>
       <input type="text" id="cfgClinic" placeholder="診間名稱" autocomplete="off" hidden>
       <div class="locked" id="lockBox">
         <div><b>伺服器</b><span id="apiShow"></span></div>
@@ -485,10 +486,11 @@ footer{ padding:16px 14px 110px; text-align:center; color:var(--ink-soft); font-
 const DEPLOY = {
   api:"https://chest-server-production.up.railway.app",
   key:"fe5573743a86302c2cf80b139760514bca07086df9c8b13b",
-  clinics:["胸腔科1診","胸腔科2診","胸腔科3診","胸腔科4診","胸腔科5診"]
+  clinics:["胸腔科1診","胸腔科2診","胸腔科3診","胸腔科4診","胸腔科5診"],
+  sessions:["上午","下午","夜間"]
 };
 const APP = {
-  version:"v2.7",
+  version:"v2.8",
   date:"2026-09-11",
   url:"https://maguro631023.github.io/wanfang-chest/",
   purpose:"協助門診病人於看診前，以點選、圖示與語音整理症狀與病史，產出供醫師參考的摘要。不做診斷，不提供治療建議，不取代醫師問診。",
@@ -929,10 +931,12 @@ const store = (() => {
 
 let ans      = store.get("ans", {});
 let meta     = store.get("meta", {});
-let settings = Object.assign({ step:"1", autoread:"on", lang:"zh", rate:"0.88", text:"on", voices:{}, docLang:"zh", api:"", key:"", clinic:"" }, store.get("settings", {}));
+let settings = Object.assign({ step:"1", autoread:"on", lang:"zh", rate:"0.88", text:"on", voices:{}, docLang:"zh", api:"", key:"", clinic:"", session:"" }, store.get("settings", {}));
 settings.voices = settings.voices || {};
 /* 網址與金鑰一律以程式內的設定為準，避免平板留著舊值 */
 if (DEPLOY.api){ settings.api = DEPLOY.api; settings.key = DEPLOY.key; store.set("settings", settings); }
+const nowSession = () => { const h = new Date().getHours(); return h < 12 ? "上午" : h < 18 ? "下午" : "夜間"; };
+if (!settings.session){ settings.session = nowSession(); store.set("settings", settings); }
 let screen   = "home";   // home | notice | q | review | doc
 let curId    = null;
 let returnToReview = false;
@@ -1439,12 +1443,12 @@ function paintChrome(){
   if (!DEPLOY.api){ tag.hidden = true; }
   else {
     tag.hidden = false;
-    tag.classList.toggle("off", !settings.clinic);
-    tag.innerHTML = settings.clinic
-      ? `<i aria-hidden="true"></i><b>${esc(settings.clinic)}</b><small>已連線</small>`
-      : `<i aria-hidden="true"></i><b>未設定診間</b>`;
-    tag.setAttribute("aria-label", settings.clinic ? `連線診間 ${settings.clinic}` : "尚未設定診間");
-    tag.title = settings.clinic ? `連線診間：${settings.clinic}（點一下可更換）` : "尚未選擇診間，點一下設定";
+    tag.classList.toggle("off", !apiOn());
+    tag.innerHTML = apiOn()
+      ? `<i aria-hidden="true"></i><b>${esc(settings.clinic)}</b><small>${esc(settings.session)}</small>`
+      : `<i aria-hidden="true"></i><b>${settings.clinic ? "未設定時段" : "未設定診間"}</b>`;
+    tag.setAttribute("aria-label", apiOn() ? `連線診間 ${clinicKey()}` : "尚未設定診間或時段");
+    tag.title = apiOn() ? `連線診間：${clinicKey()}（點一下可更換）` : "尚未設定診間或時段，點一下設定";
   }
   document.getElementById("alertHead").textContent = T("alertHead");
   document.getElementById("alertOk").textContent = T("alertOk");
@@ -1812,7 +1816,7 @@ function renderDoc(){
 
   view.innerHTML = `<div class="doc">
     ${pickupHTML()}
-    <h1 class="qtext">醫師摘要 <small style="font-size:14px;font-weight:500;color:var(--ink-soft)">${meta.serial ? "看診號碼 " + esc(meta.serial) + "｜" : ""}填寫時間 ${esc(meta.started || "—")}</small></h1>
+    <h1 class="qtext">醫師摘要 <small style="font-size:14px;font-weight:500;color:var(--ink-soft)">${meta.serial ? "看診號碼 " + esc(meta.serial) + (meta.session ? "（" + esc(meta.session) + "）" : "") + "｜" : ""}填寫時間 ${esc(meta.started || "—")}</small></h1>
     <div class="pt">${esc(ans.age || "—")} 歲　${sex}<span>${esc(labelsOf(qById("visit"),"dx")[0] || "就診類型未填")}</span>${pl.id !== "zh" ? `<span>填寫語言：${pl.zhName}</span>` : ""}</div>
 
     ${redF.length ? `<h2>紅旗 <small>病人已被提醒告知護理人員</small></h2><div class="flags">${redF.map(x => `<div class="flag red">${esc(x.text)}</div>`).join("")}</div>` : ""}
@@ -1900,7 +1904,10 @@ function wipe(){
    · 伺服器逾時自動刪除；醫師看完可按「刪除伺服器上的資料」。
    · 沒設定或連不上時，App 照常單機運作，不影響問診。
    ============================================================ */
-const apiOn = () => !!(settings.api && settings.key && settings.clinic);
+const apiOn = () => !!(settings.api && settings.key && settings.clinic && settings.session);
+/* 索引用「診間・時段」，避免不同時段的看診號碼互相覆蓋 */
+const clinicKey = sess => `${settings.clinic}・${sess || settings.session}`;
+const otherSessions = () => DEPLOY.sessions.filter(x => x !== settings.session);
 const apiBase = () => String(settings.api || "").replace(/\/+$/, "");
 async function api(path, opt){
   const o = Object.assign({ headers:{} }, opt);
@@ -1932,7 +1939,7 @@ function statsPayload(seconds, completed){
   const red = flagsFromOptions().filter(x => x.lv === "red");
   const age = Number(ans.age);
   return {
-    clinic:settings.clinic, lang:ans._lang || settings.lang,
+    clinic:clinicKey(), lang:ans._lang || settings.lang,
     age_band: age ? (age >= 90 ? "90+" : (Math.floor(age / 10) * 10) + "-" + (Math.floor(age / 10) * 10 + 9)) : "",
     sex:ans.sex || "",
     cc: Array.isArray(ans.cc) ? ans.cc.slice() : [],
@@ -1952,7 +1959,7 @@ function renderSend(){
   view.innerHTML = `
     <h1 class="qtext" style="margin-bottom:6px">請輸入您的看診號碼</h1>
     <p class="qhint">號碼在您的掛號單上。輸入後按「送出給醫師」。</p>
-    <p class="clinicname">${esc(settings.clinic)}</p>
+    <p class="clinicname">${esc(settings.clinic)}・${esc(settings.session)}</p>
     <div class="numpad"><div class="serialshow" id="snShow">${sn ? esc(sn) : "&nbsp;"}</div>
       <div class="keys">${[1,2,3,4,5,6,7,8,9].map(n => `<button data-k="${n}">${n}</button>`).join("")}
         <button class="fn" data-k="c">清除</button><button data-k="0">0</button><button class="fn" data-k="b">⌫ 刪一個</button></div></div>
@@ -1979,7 +1986,7 @@ function renderSend(){
     try {
       const red = flagsFromOptions().filter(x => x.lv === "red");
       await api("/api/visits", { method:"POST", body:JSON.stringify({
-        clinic:settings.clinic, serial:v, answers:ans,
+        clinic:clinicKey(), serial:v, answers:ans,
         cc:labelsOf(qById("cc"), "dx").join("、"), red:red.length > 0,
         lang:ans._lang || settings.lang, version:APP.version }) });
       sendStats(meta.started ? Math.round((Date.now() - (meta.startedAt || Date.now())) / 1000) : null, true);
@@ -2012,42 +2019,52 @@ let pickList = null;
 function pickupHTML(){
   if (!apiOn()) return "";
   return `<div class="pickup">
-    <h3>用看診號碼取回病人填答 <small>${esc(settings.clinic)}</small></h3>
+    <h3>用看診號碼取回病人填答 <small>${esc(settings.clinic)}・${esc(settings.session)}</small></h3>
     <div class="row">
       <input id="pkSerial" inputmode="numeric" placeholder="看診號碼" aria-label="看診號碼" value="${esc(meta.serial || "")}">
       <button class="bigbtn ok" id="pkGet">讀取</button>
       <button class="bigbtn ghost" id="pkList">今日清單</button>
     </div>
     <p class="pmsg" id="pkMsg"></p>
-    ${pickList ? `<div class="plist">${pickList.length ? pickList.map(v => `<button class="${v.red ? "red" : ""}" data-pk="${esc(v.serial)}">${esc(v.serial)}${v.cc ? `<small>${esc(String(v.cc).slice(0,14))}</small>` : ""}</button>`).join("") : "<span class=\"qhint\">目前沒有待看的填答。</span>"}</div>` : ""}
+    ${pickList ? `<div class="plist">${pickList.length ? pickList.map(v => `<button class="${v.red ? "red" : ""}" data-pk="${esc(v.serial)}" data-ps="${esc(v.session || "")}">${esc(v.serial)}<small>${v.session && v.session !== settings.session ? esc(v.session) + "・" : ""}${esc(String(v.cc || "").slice(0,12))}</small></button>`).join("") : "<span class=\"qhint\">目前沒有待看的填答。</span>"}</div>` : ""}
   </div>`;
 }
 function bindPickup(){
   if (!apiOn()) return;
   const msg = document.getElementById("pkMsg");
-  const load = async serial => {
+  /* 先找目前時段，找不到再找其他時段（避免病人在上一個時段填、跨時段看診時抓不到） */
+  const load = async (serial, sess) => {
     if (!serial){ msg.className = "pmsg err"; msg.textContent = "請輸入看診號碼。"; return; }
     msg.className = "pmsg"; msg.textContent = "讀取中…";
-    try {
-      const d = await api(`/api/visits?clinic=${encodeURIComponent(settings.clinic)}&serial=${encodeURIComponent(serial)}`);
-      ans = d.visit.answers || {};
-      meta = Object.assign({}, meta, { serial, checks:meta.checks || {}, remoteId:d.visit.id,
-        started: d.visit.created_at ? new Date(d.visit.created_at).toLocaleString("zh-TW", { hour12:false }) : meta.started });
-      save(); alerted.clear(); pickList = null;
-      screen = "doc"; render(); window.scrollTo(0,0);
-    } catch(e){ msg.className = "pmsg err"; msg.textContent = apiMsg(e); }
+    const order = sess ? [sess] : [settings.session].concat(otherSessions());
+    let lastErr = null;
+    for (const sx of order){
+      try {
+        const d = await api(`/api/visits?clinic=${encodeURIComponent(clinicKey(sx))}&serial=${encodeURIComponent(serial)}`);
+        ans = d.visit.answers || {};
+        meta = Object.assign({}, meta, { serial, session:sx, checks:meta.checks || {}, remoteId:d.visit.id,
+          started: d.visit.created_at ? new Date(d.visit.created_at).toLocaleString("zh-TW", { hour12:false }) : meta.started });
+        save(); alerted.clear(); pickList = null;
+        screen = "doc"; render(); window.scrollTo(0,0);
+        if (sx !== settings.session) flash(`這筆是${sx}的填答`);
+        return;
+      } catch(e){ lastErr = e; if (!(e.data && e.data.error === "not_found")) break; }
+    }
+    msg.className = "pmsg err"; msg.textContent = apiMsg(lastErr);
   };
   document.getElementById("pkGet").onclick = () => load(document.getElementById("pkSerial").value.trim());
   document.getElementById("pkSerial").addEventListener("keydown", e => { if (e.key === "Enter") load(e.target.value.trim()); });
   document.getElementById("pkList").onclick = async () => {
     msg.className = "pmsg"; msg.textContent = "讀取中…";
-    try {
-      const d = await api(`/api/visits?clinic=${encodeURIComponent(settings.clinic)}`);
-      pickList = d.list || []; msg.textContent = "";
-      renderDoc();
-    } catch(e){ msg.className = "pmsg err"; msg.textContent = apiMsg(e); }
+    const order = [settings.session].concat(otherSessions());
+    const all = await Promise.all(order.map(sx =>
+      api(`/api/visits?clinic=${encodeURIComponent(clinicKey(sx))}`)
+        .then(d => (d.list || []).map(v => Object.assign({ session:sx }, v))).catch(() => [])));
+    pickList = [].concat.apply([], all).sort((a, b) => b.created_at - a.created_at);
+    msg.textContent = "";
+    renderDoc();
   };
-  view.querySelectorAll("[data-pk]").forEach(b => b.onclick = () => load(b.dataset.pk));
+  view.querySelectorAll("[data-pk]").forEach(b => b.onclick = () => load(b.dataset.pk, b.dataset.ps || null));
 }
 
 /* ============================================================
@@ -2098,7 +2115,7 @@ document.getElementById("btnSet").onclick = () => {
 };
 /* 診間連線設定：診間用下拉選單，網址與金鑰鎖定（連點五下標題可臨時解鎖） */
 const cfg = { clinic:document.getElementById("cfgClinic"), api:document.getElementById("cfgApi"), key:document.getElementById("cfgKey") };
-const sel = document.getElementById("cfgClinicSel"), lockBox = document.getElementById("lockBox");
+const sel = document.getElementById("cfgClinicSel"), selS = document.getElementById("cfgSessionSel"), lockBox = document.getElementById("lockBox");
 let maint = false;
 const maskKey = k => !k ? "（未設定）" : k.length <= 12 ? "••••" : k.slice(0, 6) + "…" + k.slice(-4);
 function paintApi(){
@@ -2107,17 +2124,23 @@ function paintApi(){
   if (settings.clinic && !list.includes(settings.clinic)) list.push(settings.clinic);
   sel.innerHTML = `<option value="">請選擇診間…</option>` +
     list.map(c => `<option value="${esc(c)}"${c === settings.clinic ? " selected" : ""}>${esc(c)}</option>`).join("");
+  selS.innerHTML = `<option value="">請選擇時段…</option>` +
+    DEPLOY.sessions.map(x => `<option value="${esc(x)}"${x === settings.session ? " selected" : ""}>${esc(x)}${x === nowSession() ? "（現在）" : ""}</option>`).join("");
   document.getElementById("apiShow").textContent = settings.api || "（未設定）";
   document.getElementById("keyShow").textContent = maint ? (settings.key || "（未設定）") : maskKey(settings.key);
   lockBox.hidden = maint; cfg.api.hidden = !maint; cfg.key.hidden = !maint;
   lockBox.classList.toggle("open", maint);
-  document.getElementById("apiNote").textContent = !settings.clinic
-    ? "請先選擇這台平板所在的診間，才會啟用「送出給醫師」。"
-    : apiOn() ? `已啟用：病人填完後可用看診號碼送出給醫師（${settings.clinic}）。資料只保留數小時，看診後可立即刪除。`
+  document.getElementById("apiNote").textContent = !settings.clinic ? "請先選擇這台平板所在的診間。"
+    : !settings.session ? "請選擇看診時段。不同時段分開存放，看診號碼才不會互相覆蓋。"
+    : apiOn() ? `已啟用：病人填完後可用看診號碼送出給醫師（${clinicKey()}）。資料只保留數小時，看診後可立即刪除。`
               : "伺服器尚未設定，資料只留在這台裝置。";
 }
 sel.addEventListener("change", () => {
   settings.clinic = sel.value; store.set("settings", settings); paintApi();
+  if (screen !== "q") render();
+});
+selS.addEventListener("change", () => {
+  settings.session = selS.value; store.set("settings", settings); pickList = null; paintApi();
   if (screen !== "q") render();
 });
 ["api","key"].forEach(k => cfg[k].addEventListener("change", () => {
