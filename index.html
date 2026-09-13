@@ -284,6 +284,30 @@ footer{ padding:16px 14px 110px; text-align:center; color:var(--ink-soft); font-
 .about{ background:var(--surface); border-radius:10px; padding:12px 14px; font-size:calc(13.5px * var(--step)); line-height:1.65; }
 .about b{ display:block; font-size:calc(15px * var(--step)); margin-bottom:4px; }
 .seg.wrap button{ flex:1 1 30%; }
+/* ---------- v2.9：快速通關 ---------- */
+.qrgen{ max-width:520px; margin:0 auto; }
+.qrcard{ border:2px solid var(--line); border-radius:var(--radius); background:var(--paper); padding:20px; text-align:center; }
+.qrcard .qrimg{ display:inline-block; line-height:0; }
+.qrcard .qrimg svg{ width:min(300px,72vw); height:auto; }
+.qrcard .who{ font-size:calc(26px * var(--step)); font-weight:800; margin:14px 0 4px; }
+.qrcard .day{ font-size:calc(16px * var(--step)); color:var(--ink-soft); font-weight:700; }
+.qrcard .code{ margin:14px 0 4px; font-size:calc(15px * var(--step)); color:var(--ink-soft); font-weight:700; }
+.qrcard .num{ font-size:calc(52px * var(--step)); font-weight:800; letter-spacing:.22em; text-indent:.22em; color:var(--teal-dark); }
+.qrcard .note{ margin:14px 0 0; font-size:calc(13px * var(--step)); color:var(--ink-soft); line-height:1.6; }
+.pwbox{ max-width:380px; margin:0 auto; }
+.pwbox input{ width:100%; min-height:64px; border:3px solid var(--line); border-radius:var(--radius);
+  padding:10px 14px; font:inherit; font-size:calc(30px * var(--step)); font-weight:800; text-align:center; letter-spacing:.1em; }
+.joinopt{ display:grid; gap:12px; margin-bottom:18px; }
+#scanWrap{ border:2px solid var(--line); border-radius:var(--radius); overflow:hidden; background:#000; position:relative; }
+#scanWrap video{ width:100%; max-height:300px; object-fit:cover; display:block; }
+#scanWrap .frame{ position:absolute; inset:16% 22%; border:3px solid rgba(255,255,255,.85); border-radius:12px; }
+.codepad{ max-width:380px; margin:0 auto; }
+@media print{
+  body *{ visibility:hidden; }
+  #printArea, #printArea *{ visibility:visible; }
+  #printArea{ position:absolute; left:0; top:0; width:100%; }
+  .qrcard{ border:1px solid #999; }
+}
 .clinictag{ flex:0 0 auto; max-width:46vw; border:1.5px solid rgba(255,255,255,.3); background:rgba(255,255,255,.1);
   color:#fff; border-radius:999px; padding:7px 14px; min-height:40px; font-weight:700;
   font-size:calc(14px * var(--step)); display:flex; align-items:center; gap:7px; margin-right:10px; }
@@ -447,7 +471,10 @@ footer{ padding:16px 14px 110px; text-align:center; color:var(--ink-soft); font-
       </div>
       <input type="text" id="cfgApi" placeholder="伺服器網址" autocomplete="off" inputmode="url" hidden>
       <input type="password" id="cfgKey" placeholder="診間金鑰" autocomplete="off" hidden>
-      <button class="bigbtn ghost block" id="btnPing" style="margin-top:8px">測試連線</button>
+      <div class="btnrow" style="margin-top:8px">
+        <button class="bigbtn ghost" id="btnPing">測試連線</button>
+        <button class="bigbtn ghost" id="btnQR">快速通關 QR</button>
+      </div>
       <p class="fnote" id="apiNote"></p></div>
     <div class="field"><span>用手機掃描開啟</span>
       <div class="qrbox">
@@ -467,6 +494,7 @@ footer{ padding:16px 14px 110px; text-align:center; color:var(--ink-soft); font-
 </dialog>
 
 <script src="i18n.js"></script>
+<script src="qr.js"></script>
 <script>
 "use strict";
 /* ============================================================
@@ -487,10 +515,11 @@ const DEPLOY = {
   api:"https://chest-server-production.up.railway.app",
   key:"fe5573743a86302c2cf80b139760514bca07086df9c8b13b",
   clinics:["胸腔科1診","胸腔科2診","胸腔科3診","胸腔科4診","胸腔科5診"],
-  sessions:["上午","下午","夜間"]
+  sessions:["上午","下午","夜間"],
+  salt:"wanfang-chest-2026"
 };
 const APP = {
-  version:"v2.8",
+  version:"v2.9",
   date:"2026-09-11",
   url:"https://maguro631023.github.io/wanfang-chest/",
   purpose:"協助門診病人於看診前，以點選、圖示與語音整理症狀與病史，產出供醫師參考的摘要。不做診斷，不提供治療建議，不取代醫師問診。",
@@ -1456,6 +1485,7 @@ function paintChrome(){
 function render(){
   paintChrome();
   if (screen !== "q") document.getElementById("said").hidden = true;
+  if (screen !== "join") stopScan();
   document.getElementById("mPt").setAttribute("aria-pressed", screen !== "doc");
   document.getElementById("mDoc").setAttribute("aria-pressed", screen === "doc");
   document.getElementById("navbar").hidden = screen !== "q";
@@ -1463,6 +1493,8 @@ function render(){
   if (screen === "home") renderHome();
   else if (screen === "notice") renderNotice();
   else if (screen === "send") renderSend();
+  else if (screen === "qrgen") renderQRGen();
+  else if (screen === "join") renderJoin();
   else if (screen === "sent") renderSent();
   else if (screen === "q") renderQ();
   else if (screen === "review") renderReview();
@@ -1904,6 +1936,54 @@ function wipe(){
    · 伺服器逾時自動刪除；醫師看完可按「刪除伺服器上的資料」。
    · 沒設定或連不上時，App 照常單機運作，不影響問診。
    ============================================================ */
+/* ------------------------------------------------------------
+   快速通關：把「診間＋時段」做成 QR Code 或 4 位數字動態碼。
+   動態碼 = 由「日期＋診間＋時段＋當月密碼」算出的 4 位數，每天不同。
+   輸入動態碼時，App 會把今天所有診間與時段的組合各算一次來比對，
+   所以不需要連線也能還原出診間與時段。
+   ------------------------------------------------------------ */
+const ymd = d => { const x = d || new Date(), p = n => String(n).padStart(2,"0");
+  return `${x.getFullYear()}${p(x.getMonth()+1)}${p(x.getDate())}`; };
+const ym = d => ymd(d).slice(0, 6);
+function hash32(str){
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  h ^= h >>> 13; h = Math.imul(h, 2246822507); h ^= h >>> 16;
+  return h >>> 0;
+}
+const passCode = (date, clinic, session) =>
+  String(hash32(`${date}|${clinic}|${session}|${ym(new Date(`${date.slice(0,4)}-${date.slice(4,6)}-${date.slice(6,8)}T12:00`))}|${DEPLOY.salt}`) % 10000).padStart(4, "0");
+const joinURL = (date, clinic, session) => {
+  const ci = DEPLOY.clinics.indexOf(clinic), si = DEPLOY.sessions.indexOf(session);
+  return `${location.origin}${location.pathname}?j=${date}-${ci}-${si}-${passCode(date, clinic, session)}`;
+};
+/* 解析 QR 內容或 4 位數字，回傳可能的 {date, clinic, session} */
+function resolveJoin(input){
+  const raw = String(input || "").trim();
+  const m = raw.match(/[?&]j=(\d{8})-(\d+)-(\d+)-(\d{4})/) || raw.match(/^(\d{8})-(\d+)-(\d+)-(\d{4})$/);
+  if (m){
+    const [, date, ci, si, code] = m;
+    const clinic = DEPLOY.clinics[+ci], session = DEPLOY.sessions[+si];
+    if (!clinic || !session) return { error:"這個 QR Code 不是本院的診間代碼。" };
+    if (passCode(date, clinic, session) !== code) return { error:"代碼不正確，請確認是否為今天的 QR Code。" };
+    return { hits:[{ date, clinic, session }] };
+  }
+  if (/^\d{4}$/.test(raw)){
+    const hits = [];
+    [ymd(), ymd(new Date(Date.now() - 864e5))].forEach(date =>
+      DEPLOY.clinics.forEach(c => DEPLOY.sessions.forEach(x => {
+        if (passCode(date, c, x) === raw) hits.push({ date, clinic:c, session:x });
+      })));
+    return hits.length ? { hits } : { error:"找不到這組動態碼。請確認是今天的號碼，或改用掃描 QR Code。" };
+  }
+  return { error:"格式不正確。請掃描 QR Code，或輸入 4 位數字動態碼。" };
+}
+function applyJoin(h){
+  settings.clinic = h.clinic; settings.session = h.session;
+  store.set("settings", settings);
+  pickList = null;
+}
+
 const apiOn = () => !!(settings.api && settings.key && settings.clinic && settings.session);
 /* 索引用「診間・時段」，避免不同時段的看診號碼互相覆蓋 */
 const clinicKey = sess => `${settings.clinic}・${sess || settings.session}`;
@@ -2014,6 +2094,143 @@ function renderSent(){
   document.getElementById("kNew").onclick = wipe;
 }
 
+/* ---------- 快速通關：產生 QR（需輸入當月密碼） ---------- */
+let qrState = { ok:false, date:"", clinic:"", session:"" };
+function renderQRGen(){
+  if (!qrState.ok){
+    view.innerHTML = `
+      <h1 class="qtext" style="margin-bottom:6px">快速通關 QR Code</h1>
+      <p class="qhint">產生給門診護理師列印用的 QR Code。請輸入本月密碼（西元年月，6 位數字）。</p>
+      <div class="pwbox">
+        <input id="qrPw" inputmode="numeric" maxlength="6" placeholder="例如 ${esc(ym())}" aria-label="本月密碼">
+        <p class="pmsg" id="qrMsg"></p>
+      </div>
+      <div class="homeactions" style="margin-top:18px">
+        <button class="bigbtn ok startbtn" id="qrGo">確認</button>
+        <button class="bigbtn ghost block" id="qrBack">取消</button>
+      </div>`;
+    const inp = document.getElementById("qrPw"), msg = document.getElementById("qrMsg");
+    const go = () => {
+      if (inp.value.trim() !== ym()){
+        msg.className = "pmsg err"; msg.textContent = "密碼不正確。";
+        inp.value = ""; inp.focus(); return;
+      }
+      qrState = { ok:true, date:ymd(), clinic:settings.clinic || DEPLOY.clinics[0], session:settings.session || nowSession() };
+      renderQRGen(); window.scrollTo(0,0);
+    };
+    document.getElementById("qrGo").onclick = go;
+    inp.addEventListener("keydown", e => { if (e.key === "Enter") go(); });
+    document.getElementById("qrBack").onclick = () => { screen = "home"; render(); };
+    setTimeout(() => inp.focus(), 50);
+    return;
+  }
+
+  const { date, clinic, session } = qrState;
+  const code = passCode(date, clinic, session);
+  const pretty = `${date.slice(0,4)}/${date.slice(4,6)}/${date.slice(6,8)}`;
+  view.innerHTML = `<div class="qrgen">
+    <h1 class="qtext" style="margin-bottom:6px">快速通關 QR Code</h1>
+    <p class="qhint">選好診間與時段後列印，貼在診間或候診區。平板掃描後會自動帶入設定。</p>
+    <div class="field" style="display:grid;gap:8px;margin-bottom:16px">
+      <select id="qrClinic" aria-label="診間">${DEPLOY.clinics.map(c => `<option${c === clinic ? " selected" : ""}>${esc(c)}</option>`).join("")}</select>
+      <select id="qrSession" aria-label="時段">${DEPLOY.sessions.map(x => `<option${x === session ? " selected" : ""}>${esc(x)}</option>`).join("")}</select>
+    </div>
+    <div id="printArea"><div class="qrcard">
+      <div class="qrimg">${QR.svg(joinURL(date, clinic, session), { size:300 })}</div>
+      <p class="who">${esc(clinic)}・${esc(session)}</p>
+      <p class="day">${pretty}</p>
+      <p class="code">動態碼</p><p class="num">${esc(code)}</p>
+      <p class="note">平板設定方式：點右上角的診間標示 → 掃描此 QR Code，或直接輸入動態碼。<br>本代碼只限今天使用，隔天請重新列印。</p>
+    </div></div>
+    <div class="homeactions" style="margin-top:18px">
+      <button class="bigbtn ok startbtn" id="qrPrint">列印給門診護理師</button>
+      <button class="bigbtn ghost block" id="qrBack2">回上一頁</button>
+    </div></div>`;
+  document.getElementById("qrClinic").onchange = e => { qrState.clinic = e.target.value; renderQRGen(); };
+  document.getElementById("qrSession").onchange = e => { qrState.session = e.target.value; renderQRGen(); };
+  document.getElementById("qrPrint").onclick = () => window.print();
+  document.getElementById("qrBack2").onclick = () => { qrState.ok = false; screen = "home"; render(); };
+}
+
+/* ---------- 快速通關：掃描或輸入動態碼，帶入診間與時段 ---------- */
+let scanStream = null, scanTimer = null;
+function stopScan(){
+  if (scanTimer){ clearInterval(scanTimer); scanTimer = null; }
+  if (scanStream){ scanStream.getTracks().forEach(t => t.stop()); scanStream = null; }
+}
+function renderJoin(){
+  const canScan = "BarcodeDetector" in window && navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
+  view.innerHTML = `
+    <h1 class="qtext" style="margin-bottom:6px">設定這台平板的診間</h1>
+    <p class="qhint">用診間的快速通關 QR Code，或輸入上面的 4 位數字動態碼。</p>
+    <p class="pmsg" id="joinMsg"></p>
+    <div class="joinopt">
+      ${canScan ? `<button class="bigbtn ok startbtn" id="jScan">📷 掃描 QR Code</button>
+                   <div id="scanWrap" hidden><video id="scanVid" playsinline muted></video><div class="frame"></div></div>`
+                : `<p class="warnnote">這台裝置的瀏覽器不支援相機掃描，請改用下方的動態碼。</p>`}
+    </div>
+    <div class="codepad">
+      <div class="serialshow" id="jShow">&nbsp;</div>
+      <div class="keys">${[1,2,3,4,5,6,7,8,9].map(n => `<button data-k="${n}">${n}</button>`).join("")}
+        <button class="fn" data-k="c">清除</button><button data-k="0">0</button><button class="fn" data-k="b">⌫ 刪一個</button></div>
+    </div>
+    <div class="homeactions" style="margin-top:18px">
+      <button class="bigbtn ok startbtn" id="jGo">用動態碼設定</button>
+      <button class="bigbtn ghost block" id="jSet">改用設定頁選擇</button>
+      <button class="bigbtn ghost block" id="jBack">回上一頁</button>
+    </div>`;
+  const msg = document.getElementById("joinMsg"), show = document.getElementById("jShow");
+  let buf = "";
+  const done = r => {
+    if (r.error){ msg.className = "pmsg err"; msg.textContent = r.error; return false; }
+    if (r.hits.length > 1){
+      const pick = r.hits.map((h, i) => `${i+1}. ${h.clinic}・${h.session}`).join("\n");
+      const n = prompt("這組動態碼對應到多個診間，請輸入編號：\n" + pick);
+      const h = r.hits[Number(n) - 1];
+      if (!h) return false;
+      applyJoin(h);
+    } else applyJoin(r.hits[0]);
+    stopScan();
+    flash(`已設定：${settings.clinic}・${settings.session}`);
+    screen = "home"; render(); window.scrollTo(0,0);
+    return true;
+  };
+  view.querySelectorAll("[data-k]").forEach(b => b.onclick = () => {
+    const k = b.dataset.k;
+    if (k === "c") buf = ""; else if (k === "b") buf = buf.slice(0, -1); else if (buf.length < 4) buf += k;
+    show.innerHTML = buf || "&nbsp;";
+    msg.textContent = "";
+    if (buf.length === 4) done(resolveJoin(buf));
+  });
+  document.getElementById("jGo").onclick = () => {
+    if (buf.length !== 4){ msg.className = "pmsg err"; msg.textContent = "請輸入 4 位數字動態碼。"; return; }
+    done(resolveJoin(buf));
+  };
+  document.getElementById("jSet").onclick = () => { stopScan(); screen = "home"; render(); document.getElementById("btnSet").click(); };
+  document.getElementById("jBack").onclick = () => { stopScan(); screen = "home"; render(); };
+  const sc = document.getElementById("jScan");
+  if (sc) sc.onclick = async () => {
+    const wrap = document.getElementById("scanWrap"), vid = document.getElementById("scanVid");
+    if (scanStream){ stopScan(); wrap.hidden = true; sc.textContent = "📷 掃描 QR Code"; return; }
+    try {
+      scanStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:"environment" } });
+      vid.srcObject = scanStream; await vid.play();
+      wrap.hidden = false; sc.textContent = "停止掃描";
+      msg.className = "pmsg"; msg.textContent = "把 QR Code 對準畫面中央…";
+      const det = new BarcodeDetector({ formats:["qr_code"] });
+      scanTimer = setInterval(async () => {
+        try {
+          const codes = await det.detect(vid);
+          if (codes && codes.length) done(resolveJoin(codes[0].rawValue));
+        } catch(e){}
+      }, 400);
+    } catch(e){
+      msg.className = "pmsg err";
+      msg.textContent = "無法使用相機，請允許相機權限，或改用下方的動態碼。";
+    }
+  };
+}
+
 /* ---------- 醫師端：用序號取回 ---------- */
 let pickList = null;
 function pickupHTML(){
@@ -2104,7 +2321,7 @@ document.querySelectorAll(".seg[data-set]").forEach(seg => seg.addEventListener(
   else { settings[seg.dataset.set] = b.dataset.v; applySettings(); }
   if (screen !== "doc") render();
 }));
-document.getElementById("clinicTag").onclick = () => document.getElementById("btnSet").click();
+document.getElementById("clinicTag").onclick = () => { stopAll(); screen = "join"; render(); window.scrollTo(0,0); };
 document.getElementById("btnSet").onclick = () => {
   const l = L();
   document.getElementById("voiceInfo").textContent = !hasTTS ? "這個瀏覽器不支援語音朗讀。"
@@ -2156,6 +2373,7 @@ selS.addEventListener("change", () => {
     flash("維護模式：可修改伺服器網址與金鑰");
   });
 })();
+document.getElementById("btnQR").onclick = () => { maint = false; dlg.close(); qrState.ok = false; screen = "qrgen"; render(); window.scrollTo(0,0); };
 document.getElementById("btnPing").onclick = async () => {
   const note = document.getElementById("apiNote");
   Object.keys(cfg).forEach(k => { settings[k] = cfg[k].value.trim(); });
@@ -2290,6 +2508,19 @@ if ("serviceWorker" in navigator && (location.protocol === "https:" || location.
   }).catch(() => {});
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && swReg) swReg.update().catch(() => {}); });
 }
+
+/* 從快速通關 QR Code 開啟：?j=日期-診間-時段-動態碼 */
+(() => {
+  const j = new URLSearchParams(location.search).get("j");
+  if (!j) return;
+  const r = resolveJoin(j);
+  if (r.hits && r.hits.length === 1){
+    applyJoin(r.hits[0]);
+    render();
+    flash(`已設定：${settings.clinic}・${settings.session}`);
+  } else if (r.error) alert(r.error);
+  history.replaceState(null, "", location.pathname);
+})();
 
 /* 捷徑：?mode=doc 直接開醫師摘要（安裝後長按圖示可選） */
 if (new URLSearchParams(location.search).get("mode") === "doc"){ screen = "doc"; render(); }

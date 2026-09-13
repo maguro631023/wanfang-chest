@@ -1,9 +1,9 @@
 /* 胸訴 Service Worker —— 離線使用與版本更新
    改版時把 VERSION 加一；新版不會自己強制接管，
    而是由頁面顯示「有新版本」讓使用者按下後才更新，避免填到一半被重新整理。 */
-const VERSION = "wfchest-v10";
+const VERSION = "wfchest-v11";
 const CORE = [
-  "./", "index.html", "i18n.js", "manifest.json",
+  "./", "index.html", "i18n.js", "qr.js", "manifest.json",
   "assets/icon-192.png", "assets/icon-512.png", "assets/icon-maskable-512.png", "assets/apple-touch-icon.png",
   "assets/qr.svg", "assets/qr.png", "assets/img/index.json"
 ];
