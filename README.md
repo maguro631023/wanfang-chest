@@ -1,4 +1,4 @@
-# 胸訴 — 胸腔科門診問診（wanfang-chest）v2.9
+# 胸訴 — 胸腔科門診問診（wanfang-chest）v3.0
 
 架構比照 `wanfang-aphasia`（語圖）：無後端、資料只存本機、GitHub Pages 直接部署。
 
@@ -7,6 +7,7 @@
 |---|---|
 | `index.html` | 程式、題庫（`Q`）、醫師補問清單（`GROUPS`）、臨床提醒（`insights()`） |
 | `qr.js` | QR Code 產生器（內含 qrcode-generator 2.0.4，MIT） |
+| `qr-scan.js` | QR Code 解碼器（內含 jsQR 1.4.0，Apache-2.0）；只有按下掃描時才載入 |
 | `i18n.js` | 英語、印尼語、越南語、日語譯文（**尚未經母語者校對**） |
 | `manifest.json`、`sw.js` | PWA：可安裝、離線使用、新版本提示；改版時把 `sw.js` 的 `VERSION` 加一 |
 | `assets/qr.svg`、`qr.png` | 設定頁的 QR Code（網址改變時需重新產生） |
@@ -39,6 +40,7 @@
 ## 快速通關
 設定 →「快速通關 QR」→ 輸入本月密碼（西元年月，例如 `202609`）→ 選診間與時段 → 列印。
 平板端點右上角診間標示，掃描 QR 或輸入 4 位數字動態碼，即可帶入診間與時段。
+iPhone、iPad 的 Safari 沒有 BarcodeDetector，會自動改用內附的 jsQR 解碼；相機需要 https。
 動態碼由「日期＋診間＋時段＋當月＋`DEPLOY.salt`」算出，每天不同；改 `salt` 可讓舊的代碼全部失效。
 
 ## 審閱

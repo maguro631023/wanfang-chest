@@ -519,7 +519,7 @@ const DEPLOY = {
   salt:"wanfang-chest-2026"
 };
 const APP = {
-  version:"v2.9",
+  version:"v3.0",
   date:"2026-09-11",
   url:"https://maguro631023.github.io/wanfang-chest/",
   purpose:"協助門診病人於看診前，以點選、圖示與語音整理症狀與病史，產出供醫師參考的摘要。不做診斷，不提供治療建議，不取代醫師問診。",
@@ -2153,21 +2153,32 @@ function renderQRGen(){
 }
 
 /* ---------- 快速通關：掃描或輸入動態碼，帶入診間與時段 ---------- */
-let scanStream = null, scanTimer = null;
+let scanStream = null, scanTimer = null, jsqrLoading = null;
+function loadScanner(){
+  if (window.jsQR) return Promise.resolve(window.jsQR);
+  if (jsqrLoading) return jsqrLoading;
+  jsqrLoading = new Promise((res, rej) => {
+    const el = document.createElement("script");
+    el.src = "qr-scan.js"; el.onload = () => res(window.jsQR); el.onerror = rej;
+    document.head.appendChild(el);
+  });
+  return jsqrLoading;
+}
 function stopScan(){
   if (scanTimer){ clearInterval(scanTimer); scanTimer = null; }
   if (scanStream){ scanStream.getTracks().forEach(t => t.stop()); scanStream = null; }
 }
 function renderJoin(){
-  const canScan = "BarcodeDetector" in window && navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
+  /* iPhone、iPad 沒有 BarcodeDetector，改用內附的 jsQR 解碼，兩者都能掃 */
+  const canScan = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
   view.innerHTML = `
     <h1 class="qtext" style="margin-bottom:6px">設定這台平板的診間</h1>
     <p class="qhint">用診間的快速通關 QR Code，或輸入上面的 4 位數字動態碼。</p>
     <p class="pmsg" id="joinMsg"></p>
     <div class="joinopt">
       ${canScan ? `<button class="bigbtn ok startbtn" id="jScan">📷 掃描 QR Code</button>
-                   <div id="scanWrap" hidden><video id="scanVid" playsinline muted></video><div class="frame"></div></div>`
-                : `<p class="warnnote">這台裝置的瀏覽器不支援相機掃描，請改用下方的動態碼。</p>`}
+                   <div id="scanWrap" hidden><video id="scanVid" playsinline muted autoplay></video><div class="frame"></div></div>`
+                : `<p class="warnnote">這台裝置無法使用相機（需要 https 或相機權限），請改用下方的動態碼。</p>`}
     </div>
     <div class="codepad">
       <div class="serialshow" id="jShow">&nbsp;</div>
@@ -2211,22 +2222,48 @@ function renderJoin(){
   const sc = document.getElementById("jScan");
   if (sc) sc.onclick = async () => {
     const wrap = document.getElementById("scanWrap"), vid = document.getElementById("scanVid");
-    if (scanStream){ stopScan(); wrap.hidden = true; sc.textContent = "📷 掃描 QR Code"; return; }
+    if (scanStream){ stopScan(); wrap.hidden = true; sc.textContent = "📷 掃描 QR Code"; msg.textContent = ""; return; }
+    msg.className = "pmsg"; msg.textContent = "啟動相機中…";
     try {
-      scanStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:"environment" } });
-      vid.srcObject = scanStream; await vid.play();
+      /* 有些 iPad 沒有後鏡頭，exact 會直接失敗，所以用 ideal */
+      scanStream = await navigator.mediaDevices.getUserMedia({
+        video:{ facingMode:{ ideal:"environment" }, width:{ ideal:1280 }, height:{ ideal:720 } }, audio:false });
+      vid.srcObject = scanStream;
+      vid.setAttribute("playsinline", "");           // iOS 不加會全螢幕播放
+      await vid.play();
       wrap.hidden = false; sc.textContent = "停止掃描";
-      msg.className = "pmsg"; msg.textContent = "把 QR Code 對準畫面中央…";
-      const det = new BarcodeDetector({ formats:["qr_code"] });
+      msg.textContent = "把 QR Code 對準畫面中央…";
+
+      const native = ("BarcodeDetector" in window) ? new BarcodeDetector({ formats:["qr_code"] }) : null;
+      let decode;
+      if (native){
+        decode = async () => { const c = await native.detect(vid); return c && c.length ? c[0].rawValue : null; };
+      } else {
+        const jsQR = await loadScanner();
+        const cv = document.createElement("canvas"), cx = cv.getContext("2d", { willReadFrequently:true });
+        decode = async () => {
+          const w = vid.videoWidth, h = vid.videoHeight;
+          if (!w || !h) return null;
+          const scale = Math.min(1, 480 / Math.max(w, h));
+          cv.width = Math.round(w * scale); cv.height = Math.round(h * scale);
+          cx.drawImage(vid, 0, 0, cv.width, cv.height);
+          const img = cx.getImageData(0, 0, cv.width, cv.height);
+          const r = jsQR(img.data, img.width, img.height, { inversionAttempts:"dontInvert" });
+          return r ? r.data : null;
+        };
+      }
+      let busy = false;
       scanTimer = setInterval(async () => {
-        try {
-          const codes = await det.detect(vid);
-          if (codes && codes.length) done(resolveJoin(codes[0].rawValue));
-        } catch(e){}
-      }, 400);
+        if (busy) return; busy = true;
+        try { const v = await decode(); if (v) done(resolveJoin(v)); } catch(e){}
+        busy = false;
+      }, 250);
     } catch(e){
+      stopScan();
       msg.className = "pmsg err";
-      msg.textContent = "無法使用相機，請允許相機權限，或改用下方的動態碼。";
+      msg.textContent = (e && e.name === "NotAllowedError")
+        ? "相機權限被拒絕。請到瀏覽器設定允許相機，或改用下方的動態碼。"
+        : "無法使用相機，請改用下方的動態碼。";
     }
   };
 }
